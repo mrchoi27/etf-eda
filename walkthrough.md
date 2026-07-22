@@ -1,6 +1,6 @@
 # ETF EDA 정적 대시보드 구축 및 배포 자동화 완료 보고서
 
-네이버 금융 실시간 ETF API 데이터를 활용한 12대 핵심 EDA 분석 정적 대시보드와 GitHub Actions를 활용한 스케줄링 업데이트 파이프라인의 구축을 성공적으로 완료하였습니다. 추가적으로 자산운용사별 분석 도구(트리맵 및 막대 차트)를 보강하였습니다.
+네이버 금융 실시간 ETF API 데이터를 활용한 12대 핵심 EDA 분석 정적 대시보드와 GitHub Actions를 활용한 스케줄링 업데이트 파이프라인의 구축을 성공적으로 완료하였습니다.
 
 ---
 
@@ -10,11 +10,12 @@
 
 ```mermaid
 graph TD
-    subgraph GitHub_Actions_Runner [GitHub Actions Runner (평일 09~16시 매시 정각)]
-        A[collect_data.py 실행] -->|API 호출| B(네이버 금융 ETF API)
+    subgraph GitHub_Actions_Runner [GitHub Actions Runner (평일 09~15시 매시 정각 구동)]
+        A[60분 동안 1분 주기로 Loop 실행] -->|API 호출| B(네이버 금융 ETF API)
         B -->|JSON 응답 수집| A
-        A -->|데이터 전처리 및 변환| C[data/etf_data.json 생성/갱신]
-        C -->|Git Commit & Push| D((GitHub Repository Main Branch))
+        A -->|데이터 전처리 및 변환| C[data/etf_data.json 갱신]
+        C -->|변동 감지 시 Git Commit & Push| D((GitHub Repository Main Branch))
+        A -->|60초 대기 sleep 60| A
     end
 
     subgraph GitHub_Pages_Hosting [GitHub Pages Web Hosting]
@@ -34,10 +35,10 @@ graph TD
 
 ## 2. 주요 구현 내역
 
-### 📂 주요 신규 생성 파일
+### 📂 주요 신규 생성 및 수정 파일
 * 🐍 [collect_data.py](file:///c:/Users/student/Documents/etf-eda/src/collect_data.py): 데이터 수집 및 전처리 파이프라인 (파이썬)
 * 🌐 [index.html](file:///c:/Users/student/Documents/etf-eda/index.html): 실시간 필터 및 12대 차트 EDA 대시보드 (HTML/JS)
-* ⚙️ [data_update.yml](file:///c:/Users/student/Documents/etf-eda/.github/workflows/data_update.yml): GitHub Actions 자동화 워크플로우 (YAML)
+* ⚙️ [data_update.yml](file:///c:/Users/student/Documents/etf-eda/.github/workflows/data_update.yml): GitHub Actions 1분 수집 루프 워크플로우 (YAML)
 
 ---
 
@@ -65,14 +66,16 @@ graph TD
   8. **시가총액 vs 거래대금 상관성** 버블 산점도 (등락률 크기 반영)
   9. **자산군별 시가총액 점유율** 도넛 차트
   10. **시가총액 규모별 NAV 괴리율** 분포 산점도
-  11. **운용사 및 종목 포트폴리오 트리맵** (Treemap) - 클릭 시 하위 종목 줌인/줌아웃 지원 (신규)
-  12. **자산운용사별 합산 시가총액 비교** 막대 차트 (신규)
+  11. **운용사 및 종목 포트폴리오 트리맵** (Treemap) - 클릭 시 하위 종목 줌인/줌아웃 지원
+  12. **자산운용사별 합산 시가총액 비교** 막대 차트
 - **통계 연산**: JavaScript로 구현된 기술통계량 산출 로직을 통해 평균, 표준편차, 사분위수(25%, 50%, 75%), 피어슨 상관계수 등을 테이블에 실시간으로 출력합니다.
 - **전체 테이블 정렬**: 각 테이블 헤더 클릭 시 오름차순/내림차순 정렬 기능을 바닐라 JavaScript로 가볍게 구현했습니다.
 
-### 3) GitHub Actions 자동화 ([data_update.yml](file:///c:/Users/student/Documents/etf-eda/.github/workflows/data_update.yml))
-- 한국 시간(KST) 기준 **평일 오전 9시부터 오후 4시까지 매시 정각**에 크론식(`0 0-7 * * 1-5`)을 통해 동작합니다.
-- 변경된 사항이 존재할 때만 자동 커밋 및 푸시하여 GitHub Actions 리소스를 절약하고 불필요한 Git 히스토리를 방지합니다.
+### 3) 1분 주기 수집 루프 자동화 ([data_update.yml](file:///c:/Users/student/Documents/etf-eda/.github/workflows/data_update.yml))
+- GitHub Actions의 5분 최소 주기 스케줄링 한계를 극복하기 위해, **워크플로우 내 쉘 스크립트 기반 루프(sleep 60)** 방식으로 설계했습니다.
+- 한국 시간(KST) 기준 **평일 오전 9시부터 오후 3시까지 매시 정각**에 자동으로 구동되어 60분 동안 수집을 지속합니다. 각 정각에 실행되는 러너들이 바톤을 이어받아 개장 시간 내내 끊김 없는 1분 단위 수집을 달성합니다.
+- 동시 실행에 따른 Git Pushing 충돌을 방지하기 위해 커밋 전 `git pull --rebase` 연동을 의무화하였습니다.
+- 데이터 값에 실질적 변화가 없는 경우에는 커밋을 생략하여 Git 히스토리를 절약합니다.
 
 ---
 
@@ -82,6 +85,12 @@ graph TD
 * 현재 로컬 웹 서버가 포트 `8000`에서 백그라운드로 실행 중입니다.
 * 브라우저를 열고 다음 URL에 접속하여 직접 필터 조작 및 10가지 차트 전환을 확인하실 수 있습니다:
   👉 **[http://localhost:8000/index.html](http://localhost:8000/index.html)**
+
+### 2) 수동 수집 트리거 및 1분 갱신 테스트
+* GitHub Repository of **Actions** 탭으로 이동합니다.
+* **Realtime ETF Data Update and Deploy** 워크플로우를 선택합니다.
+* **Run workflow** 버튼을 누르고 수집할 지속 시간(`duration_minutes`, 예: 테스트 목적의 5분)을 입력한 뒤 실행합니다.
+* 실행 후 1분마다 `data/etf_data.json`이 갱신되어 자동으로 커밋/푸시가 일어나고 Pages가 갱신되는지 로그를 통해 확인할 수 있습니다.
 
 ---
 
