@@ -11,6 +11,7 @@ __pycache__/
 # Data & Images (폴더 구조는 유지하되 안의 파일들은 제외)
 /data/*
 !/data/.gitkeep
+!/data/etf_data.json
 /images/*
 !/images/.gitkeep
 
