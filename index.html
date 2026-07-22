@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>네이버 금융 실시간 ETF 종합 EDA 대시보드</title>
+  <!-- Outfit & Inter 구글 폰트 로드 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Plotly.js CDN -->
+  <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+  <!-- FontAwesome 아이콘 로드 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            title: ['Outfit', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* 스크롤바 커스텀 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .plotly-graph-div {
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+
+  <!-- 헤더 영역 -->
+  <header class="bg-slate-900 text-white shadow-md py-4 px-6 sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="bg-blue-600 text-white p-2 rounded-lg text-xl shadow-inner">
+          <i class="fa-solid fa-chart-line"></i>
+        </div>
+        <div>
+          <h1 class="text-xl md:text-2xl font-title font-extrabold tracking-tight">네이버 금융 실시간 ETF 종합 EDA 대시보드</h1>
+          <p class="text-xs text-slate-400">정적 페이지 기반 실시간 데이터 가공 및 10대 핵심 비즈니스 시각화 분석</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-xs md:text-sm bg-slate-800 px-3 py-1.5 rounded-full border border-slate-700 text-slate-300">
+          <i class="fa-solid fa-clock mr-1.5 text-blue-400"></i> 데이터 기준: <span id="data-updated-time">로딩 중...</span>
+        </span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 메인 콘텐트 영역 (사이드바 + 콘텐츠) -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 flex flex-col lg:flex-row gap-6">
+
+    <!-- 좌측 사이드바 필터 영역 -->
+    <aside class="w-full lg:w-80 flex-shrink-0 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-5 flex flex-col gap-6 h-fit sticky lg:top-24">
+      <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+        <h2 class="font-title font-bold text-lg text-slate-900 flex items-center gap-2">
+          <i class="fa-solid fa-sliders text-blue-600"></i>대화형 필터 옵션
+        </h2>
+        <button id="btn-reset-filters" class="text-xs text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 font-medium transition">
+          <i class="fa-solid fa-rotate-left"></i>초기화
+        </button>
+      </div>
+
+      <!-- 검색어 필터 -->
+      <div class="flex flex-col gap-2">
+        <label for="filter-search" class="text-xs font-semibold text-slate-500 uppercase tracking-wider">종목명 또는 코드 검색</label>
+        <div class="relative">
+          <input type="text" id="filter-search" placeholder="예: KODEX 200, 069500" 
+                 class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3 text-slate-400 text-xs"></i>
+        </div>
+      </div>
+
+      <!-- 자산군 필터 -->
+      <div class="flex flex-col gap-2">
+        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">자산군 분류 필터</span>
+        <div id="filter-asset-classes" class="flex flex-col gap-1.5 max-h-48 overflow-y-auto pr-1">
+          <!-- JS에서 동적으로 체크박스 생성 -->
+        </div>
+      </div>
+
+      <!-- 시가총액 범위 필터 -->
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center text-xs">
+          <span class="font-semibold text-slate-500 uppercase tracking-wider">시가총액 범위</span>
+          <span id="label-market-sum" class="text-blue-600 font-bold font-title">로딩 중...</span>
+        </div>
+        <div class="flex gap-2">
+          <input type="range" id="filter-market-sum-min" class="w-1/2 accent-blue-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer">
+          <input type="range" id="filter-market-sum-max" class="w-1/2 accent-blue-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+          <span id="min-market-sum-bound">0억</span>
+          <span id="max-market-sum-bound">0억</span>
+        </div>
+      </div>
+
+      <!-- 거래대금 범위 필터 -->
+      <div class="flex flex-col gap-2">
+        <div class="flex justify-between items-center text-xs">
+          <span class="font-semibold text-slate-500 uppercase tracking-wider">거래대금 범위</span>
+          <span id="label-amount" class="text-blue-600 font-bold font-title">로딩 중...</span>
+        </div>
+        <div class="flex gap-2">
+          <input type="range" id="filter-amount-min" class="w-1/2 accent-blue-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer">
+          <input type="range" id="filter-amount-max" class="w-1/2 accent-blue-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer">
+        </div>
+        <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+          <span id="min-amount-bound">0백만</span>
+          <span id="max-amount-bound">0백만</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 우측 메인 대시보드 영역 -->
+    <div class="flex-1 flex flex-col gap-6">
+
+      <!-- 상단 요약 KPI 영역 -->
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- 총 상장 종목 수 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4 transition hover:shadow-md">
+          <div class="bg-blue-50 text-blue-600 p-3.5 rounded-xl text-xl">
+            <i class="fa-solid fa-list-check"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">총 상장 종목 수</p>
+            <h3 id="kpi-total-count" class="text-2xl font-title font-bold text-slate-900 mt-1">- 개</h3>
+            <p id="kpi-total-count-desc" class="text-[11px] text-slate-500 mt-0.5">전체 대비 -%</p>
+          </div>
+        </div>
+
+        <!-- 총 시가총액 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4 transition hover:shadow-md">
+          <div class="bg-emerald-50 text-emerald-600 p-3.5 rounded-xl text-xl">
+            <i class="fa-solid fa-coins"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">총 시가총액</p>
+            <h3 id="kpi-total-market-sum" class="text-2xl font-title font-bold text-slate-900 mt-1">- 조원</h3>
+            <p id="kpi-avg-market-sum" class="text-[11px] text-slate-500 mt-0.5">평균 - 억원</p>
+          </div>
+        </div>
+
+        <!-- 당일 총 거래대금 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4 transition hover:shadow-md">
+          <div class="bg-amber-50 text-amber-600 p-3.5 rounded-xl text-xl">
+            <i class="fa-solid fa-money-bill-transfer"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">당일 총 거래대금</p>
+            <h3 id="kpi-total-amount" class="text-2xl font-title font-bold text-slate-900 mt-1">- 십억원</h3>
+            <p id="kpi-avg-amount" class="text-[11px] text-slate-500 mt-0.5">평균 - 백만원</p>
+          </div>
+        </div>
+
+        <!-- 상승 / 하락 / 보합 비율 -->
+        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 flex items-center gap-4 transition hover:shadow-md">
+          <div class="bg-rose-50 text-rose-600 p-3.5 rounded-xl text-xl">
+            <i class="fa-solid fa-arrows-up-down"></i>
+          </div>
+          <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">상승 / 하락 / 보합</p>
+            <h3 id="kpi-trend-ratio" class="text-2xl font-title font-bold text-slate-900 mt-1">🔺- | 🔻-</h3>
+            <p id="kpi-trend-flat" class="text-[11px] text-slate-500 mt-0.5">보합 - 개</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 탭 선택 바 -->
+      <nav class="flex flex-wrap gap-1.5 border-b border-slate-200 pb-px">
+        <button data-tab="tab-overview" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-house"></i>시장 요약 & 데이터
+        </button>
+        <button data-tab="tab-scale" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-gem"></i>규모 및 유동성
+        </button>
+        <button data-tab="tab-volatility" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-bolt-lightning"></i>변동성 및 수익률
+        </button>
+        <button data-tab="tab-momentum" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-fire-flame-curved"></i>모멘텀 & 테마 로테이션
+        </button>
+        <button data-tab="tab-structure" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-puzzle-piece"></i>자산군 구조 & 시장 효율성
+        </button>
+      </nav>
+
+      <!-- 탭별 본문 영역 -->
+      <section id="tab-content" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 min-h-[400px]">
+        
+        <!-- 탭 1: 시장 요약 & 데이터 미리보기 -->
+        <div id="content-tab-overview" class="tab-panel hidden flex flex-col gap-8">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Head 상위 5개 -->
+            <div class="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
+              <h4 class="font-title font-bold text-slate-950 flex items-center gap-1.5 mb-3">
+                <i class="fa-solid fa-arrow-trend-up text-blue-600"></i>[Head] 시가총액 상위 5개 종목
+              </h4>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left text-slate-600">
+                  <thead class="text-[10px] text-slate-500 uppercase tracking-wider bg-slate-100 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-2 font-medium">코드</th>
+                      <th class="px-3 py-2 font-medium">종목명</th>
+                      <th class="px-3 py-2 font-medium">자산분류</th>
+                      <th class="px-3 py-2 text-right font-medium">현재가</th>
+                      <th class="px-3 py-2 text-right font-medium">시가총액</th>
+                      <th class="px-3 py-2 text-right font-medium">등락률</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-head-5" class="divide-y divide-slate-100">
+                    <!-- JS 렌더링 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <!-- Tail 하위 5개 -->
+            <div class="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
+              <h4 class="font-title font-bold text-slate-950 flex items-center gap-1.5 mb-3">
+                <i class="fa-solid fa-arrow-trend-down text-rose-600"></i>[Tail] 시가총액 하위 5개 종목
+              </h4>
+              <div class="overflow-x-auto">
+                <table class="w-full text-xs text-left text-slate-600">
+                  <thead class="text-[10px] text-slate-500 uppercase tracking-wider bg-slate-100 border-b border-slate-200">
+                    <tr>
+                      <th class="px-3 py-2 font-medium">코드</th>
+                      <th class="px-3 py-2 font-medium">종목명</th>
+                      <th class="px-3 py-2 font-medium">자산분류</th>
+                      <th class="px-3 py-2 text-right font-medium">현재가</th>
+                      <th class="px-3 py-2 text-right font-medium">시가총액</th>
+                      <th class="px-3 py-2 text-right font-medium">등락률</th>
+                    </tr>
+                  </thead>
+                  <tbody id="table-tail-5" class="divide-y divide-slate-100">
+                    <!-- JS 렌더링 -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-3">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-2">
+              <h4 class="font-title font-bold text-lg text-slate-950 flex items-center gap-1.5">
+                <i class="fa-solid fa-list text-slate-600"></i>전체 필터링 데이터 테이블 <span id="table-row-count" class="text-xs text-slate-400 font-normal">(-개 종목)</span>
+              </h4>
+              <span class="text-[10px] text-slate-400"><i class="fa-solid fa-info-circle mr-1"></i>열 머리글을 클릭하면 오름차순/내림차순으로 정렬할 수 있습니다.</span>
+            </div>
+            <!-- 테이블 뷰어 -->
+            <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-[500px]">
+              <table class="w-full text-xs text-slate-600 table-auto min-w-[1000px]">
+                <thead class="text-[11px] text-slate-500 uppercase tracking-wider bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                  <tr id="all-table-header">
+                    <th data-col="itemcode" class="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-slate-100 transition">종목코드 <span class="sort-icon"></span></th>
+                    <th data-col="itemname" class="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-slate-100 transition">종목명 <span class="sort-icon"></span></th>
+                    <th data-col="assetClass" class="px-4 py-3 text-left font-semibold cursor-pointer hover:bg-slate-100 transition">자산분류 <span class="sort-icon"></span></th>
+                    <th data-col="nowVal" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">현재가(원) <span class="sort-icon"></span></th>
+                    <th data-col="changeVal" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">대비(원) <span class="sort-icon"></span></th>
+                    <th data-col="changeRate" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">등락률(%) <span class="sort-icon"></span></th>
+                    <th data-col="nav" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">NAV(원) <span class="sort-icon"></span></th>
+                    <th data-col="disparityRate" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">괴리율(%) <span class="sort-icon"></span></th>
+                    <th data-col="threeMonthEarnRate" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">3개월수익률(%) <span class="sort-icon"></span></th>
+                    <th data-col="quant" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">거래량 <span class="sort-icon"></span></th>
+                    <th data-col="amonut" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">거래대금(백만) <span class="sort-icon"></span></th>
+                    <th data-col="marketSum" class="px-4 py-3 text-right font-semibold cursor-pointer hover:bg-slate-100 transition">시가총액(억) <span class="sort-icon"></span></th>
+                    <th data-col="trend" class="px-4 py-3 text-center font-semibold cursor-pointer hover:bg-slate-100 transition">등락구분 <span class="sort-icon"></span></th>
+                  </tr>
+                </thead>
+                <tbody id="table-all-body" class="divide-y divide-slate-200">
+                  <!-- JS 렌더링 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 2: 규모 및 유동성 -->
+        <div id="content-tab-scale" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 1. 시가총액 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">1. 시가총액 TOP 20 종목 분석</h4>
+              </div>
+              <div id="chart-market-sum-top20" class="h-[450px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 1] 시가총액 상위 20개 종목 주요 지표</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg max-h-56">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">순위</th>
+                        <th class="px-3 py-2 font-semibold">종목명</th>
+                        <th class="px-3 py-2 text-right font-semibold">시가총액(억)</th>
+                        <th class="px-3 py-2 text-right font-semibold">현재가</th>
+                        <th class="px-3 py-2 text-right font-semibold">3개월수익률(%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-top20-market" class="divide-y divide-slate-100">
+                      <!-- JS 렌더링 -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <!-- 인사이트 -->
+              <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>한국 ETF 시장의 시가총액 집중도는 매우 높은 편이며, 주로 코스피 200이나 미국 S&P500, 나스닥100 등 대표 지수를 추종하는 패시브 상품들이 상위권을 독점하고 있습니다. 이는 개인 투자자들의 장기 연금 계좌를 통한 적립식 투자와 기관 투자자들의 자산 배분 전략이 이들 핵심 지수에 집중되고 있음을 반영합니다. 이러한 대형 지수 중심의 성장은 시장의 전반적인 유동성을 보강하지만, 한편으로는 특정 초대형 종목들의 주가 등락이 지수 전체와 ETF 시장 판세를 과도하게 좌우하는 왜곡 현상을 낳을 수도 있습니다. 투자자 입장에서는 대형 패시브 자금의 유입에 따른 대형주 프리미엄 현상을 인지하고, 지수 내 비중 변화에 따른 리밸런싱 수요를 파악하여 투자 기회로 활용할 필요가 있습니다.</p>
+              </div>
+            </div>
+
+            <!-- 2. 거래대금 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">2. 거래대금 TOP 20 종목 분석</h4>
+              </div>
+              <div id="chart-amount-top20" class="h-[450px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 2] 거래대금 상위 20개 종목 주요 지표</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg max-h-56">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100 sticky top-0">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">순위</th>
+                        <th class="px-3 py-2 font-semibold">종목명</th>
+                        <th class="px-3 py-2 text-right font-semibold">거래대금(백만)</th>
+                        <th class="px-3 py-2 text-right font-semibold">등락률(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">거래량</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-top20-amount" class="divide-y divide-slate-100">
+                      <!-- JS 렌더링 -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <!-- 인사이트 -->
+              <div class="bg-rose-50/70 border border-rose-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-rose-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>거래대금 상위 종목은 당일 시장에서 가장 유동성이 풍부하며 투자자들의 관심이 극도로 쏠려 있는 섹터가 무엇인지를 실시간으로 보여줍니다. 보통 레버리지 및 인버스 파생 상품이나 시장의 가장 뜨거운 단기 테마형 ETF(예: AI 반도체, 바이오, 2차전지 등)가 높은 순위를 차지합니다. 거래대금의 급증은 시장의 단기 투기적 자금 흐름과 강한 모멘텀을 시사하며, 개인 투자자들의 적극적인 참여와 기관 및 외국인의 단기 포트폴리오 헤징 활동이 결합된 결과입니다. 하지만 이러한 유동성 쏠림은 테마의 과열을 경고하는 신호일 수도 있으므로, 거래대금이 이례적으로 폭발한 이후 거래량이 급감하며 발생하는 가격 조정 리스크에 항상 유의해야 합니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 3: 변동성 및 수익률 -->
+        <div id="content-tab-volatility" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 3. 등락률 분포 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">3. 당일 등락률 분포 분석</h4>
+              </div>
+              <div id="chart-change-rate-dist" class="h-[350px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 3] 당일 등락률 요약 통계</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">지표</th>
+                        <th class="px-3 py-2 text-right font-semibold">개수</th>
+                        <th class="px-3 py-2 text-right font-semibold">평균(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">표준편차</th>
+                        <th class="px-3 py-2 text-right font-semibold">최소(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">25%</th>
+                        <th class="px-3 py-2 text-right font-semibold">중앙값(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">75%</th>
+                        <th class="px-3 py-2 text-right font-semibold">최대(%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-change-rate-desc" class="divide-y divide-slate-100 font-mono">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트
+                </div>
+                <p>오늘 하루 동안 거래된 전체 ETF의 등락률 분포는 현재 시장의 전반적인 센티먼트와 온도를 즉각적으로 진단하는 지표입니다. 분포의 대칭성(왜도)을 분석하여 상승 종목이 지배적인 불장(Bull market)인지, 혹은 하락 종목이 우세한 약세장(Bear market)인지를 시각적으로 파악할 수 있습니다. 박스플롯 상에서 발견되는 이상치(Outlier)들은 시장 평균 수준을 벗어나 오늘 하루 극단적인 급등이나 급락을 기록한 특정 테마 ETF들을 나타내며, 이는 개별 업종의 강한 호재나 악재를 매크로 흐름과 독립적으로 보여줍니다. 투자자는 전체 분포의 중앙값 대비 이상치들의 거리를 관찰하여 현재 시장의 변동성이 특정 섹터에 국한된 것인지, 아니면 시장 전체의 체계적 리스크로 확산되는 중인지 평가할 수 있습니다.</p>
+              </div>
+            </div>
+
+            <!-- 4. 3개월 수익률 분포 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">4. 3개월 수익률 분포 분석</h4>
+              </div>
+              <div id="chart-three-month-earn-dist" class="h-[350px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 4] 3개월 수익률 요약 통계</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">지표</th>
+                        <th class="px-3 py-2 text-right font-semibold">개수</th>
+                        <th class="px-3 py-2 text-right font-semibold">평균(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">표준편차</th>
+                        <th class="px-3 py-2 text-right font-semibold">최소(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">25%</th>
+                        <th class="px-3 py-2 text-right font-semibold">중앙값(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">75%</th>
+                        <th class="px-3 py-2 text-right font-semibold">최대(%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-three-month-earn-desc" class="divide-y divide-slate-100 font-mono">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-emerald-50/70 border border-emerald-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-emerald-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트
+                </div>
+                <p>3개월 누적 수익률 분포는 단기 소음(Noise)을 걷어내고 중기적인 시장의 추세와 건강 상태를 평가하는 데 매우 유용한 지표입니다. 3개월 분포가 양의 방향으로 길게 꼬리를 늘어뜨리고 있다면 최근 분기 동안 전반적인 상승 랠리가 지속되며 강한 추종 자금이 시장을 이끌었음을 의미하며, 반대로 음의 영역에 쏠려 있다면 전반적인 시장 조정 혹은 하락 압력이 누적되었음을 시사합니다. 중기 자산 배분 관점에서 이 분포의 중앙값과 사분위수 범위를 모니터링하면 현재 시장이 과매수 영역에 도달했는지 혹은 낙폭 과대로 인한 저가 매수 진입 시점인지를 가늠할 수 있어, 포트폴리오의 주식 비중을 조절하는 전략적 의사결정에 기여할 수 있습니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <hr class="border-slate-150">
+
+          <!-- 5. 거래량 vs 거래대금 -->
+          <div class="flex flex-col gap-4">
+            <div class="border-b border-slate-100 pb-2">
+              <h4 class="font-title font-bold text-lg text-slate-900">5. 거래량(Quant) 대비 거래대금(Amount) 분석</h4>
+            </div>
+            <div id="chart-quant-vs-amount" class="h-[450px]"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div class="lg:col-span-1">
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 5] 자산군별 평균 거래량 및 거래대금</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">자산군</th>
+                        <th class="px-3 py-2 text-right font-semibold">평균 거래량</th>
+                        <th class="px-3 py-2 text-right font-semibold">평균 거래대금(백만)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-avg-quant-amount" class="divide-y divide-slate-100">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="lg:col-span-2 bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700 flex flex-col justify-center">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>거래량과 거래대금의 비율을 나타내는 이 분석은 개별 ETF의 1주당 평균 단가(Unit Price) 구조가 시장의 거래 활성도에 미치는 영향을 파악하는 데 유용합니다. 주당 가격이 높은 고단가 ETF(예: 10만 원 이상)는 거래량 자체는 적어 보일지라도 실제 유입된 자금 규모(거래대금)는 매우 클 수 있으며, 이는 호가 스프레드가 촘촘하게 관리되어 거래 비용 측면에서 매우 유리함을 시사합니다. 반면, 주당 가격이 매우 낮은 동전주 형태의 ETF는 거래량은 엄청나지만 실질 거래대금은 미미하여 호가 왜곡이 발생하기 쉽고 투기적 거래에 노출될 위험이 있습니다. 따라서 분석가는 겉보기 거래량에 현혹되지 않고 실질 거래대금과 단가 구조를 연계하여 종합적인 유동성을 평가해야 합니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 4: 모멘텀 & 테마 로테이션 -->
+        <div id="content-tab-momentum" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 6. 당일 등락률 TOP 10 (상승/하락) -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">6. 당일 등락률 TOP 10 (상승 vs 하락)</h4>
+              </div>
+              <div id="chart-momentum-top10" class="h-[500px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 6] 극단 모멘텀 종목 지표</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">구분</th>
+                        <th class="px-3 py-2 font-semibold">종목명</th>
+                        <th class="px-3 py-2 text-right font-semibold">등락률(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">현재가</th>
+                        <th class="px-3 py-2 text-right font-semibold">거래대금(백만)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-momentum-top10" class="divide-y divide-slate-100">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-slate-50/80 border border-slate-200 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-slate-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>오늘 하루 동안 가장 극단적인 모멘텀을 보인 상하위 10개 종목의 대비는 시장의 주도 테마와 소외 테마 간의 자금 이동과 순환매 패턴을 극명하게 보여줍니다. 급등 1위 그룹의 주도 섹터(예: 특정 반도체나 원자재)와 급락 1위 그룹의 섹터 간 상반된 움직임은 매크로 환경(금리 변동, 환율 변동, 지정학적 리스크 등)이 개별 산업에 어떻게 차별적으로 작용하고 있는지 분석하는 단초가 됩니다. 특히 등락률 상위권에 레버리지/인버스 파생 ETF가 대거 포진해 있다면 방향성 베팅이 심화된 변동성 국면임을 뜻하며, 특정 테마의 독주는 시장 자금의 쏠림이 임계점에 도달해 단기 기술적 반등이나 차익 실현 매물이 출현할 타이밍임을 암시할 수 있습니다.</p>
+              </div>
+            </div>
+
+            <!-- 7. 3개월 수익률 TOP 10 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">7. 3개월 수익률 TOP 10 종목</h4>
+              </div>
+              <div id="chart-three-month-earn-top10" class="h-[500px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 7] 중기 수익률 우수 종목 지표</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">순위</th>
+                        <th class="px-3 py-2 font-semibold">종목명</th>
+                        <th class="px-3 py-2 text-right font-semibold">3개월수익률(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">시가총액(억)</th>
+                        <th class="px-3 py-2 text-right font-semibold">현재가</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-three-month-earn-top10" class="divide-y divide-slate-100">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-emerald-50/70 border border-emerald-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-emerald-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>최근 3개월 누적 수익률 상위 10개 종목은 단순한 당일 변동성을 넘어 중기적으로 시장을 지배하고 있는 진정한 '메가 트렌드'를 식별하는 지표입니다. 이 영역에 지속적으로 이름을 올리는 ETF들은 기초자산의 펀더멘털 개선이나 구조적인 산업 성장세가 뒷받침되고 있는 경우가 많습니다. 모멘텀 투자 관점에서는 이들 주도주에 올라타는 전략이 유효할 수 있으나, 단기 과열로 인해 기초자산 대비 괴리율이나 밸류에이션 부담이 과도하지 않은지 반드시 체크해야 합니다. 20년차 분석가 관점에서는 이 상위 목록의 업종 구성 변화(예: 기술주에서 가치주로의 전환 등)를 관찰함으로써 시장의 거시적 로테이션 신호를 선제적으로 포착할 수 있습니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 5: 자산군 구조 & 시장 효율성 -->
+        <div id="content-tab-structure" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 8. 시가총액 vs 거래대금 상관성 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">8. 시가총액 vs 거래대금 상관성 분석</h4>
+              </div>
+              <div id="chart-market-sum-vs-amount-corr" class="h-[450px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 8] 상관관계 분석 지표 (피어슨 상관계수)</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-slate-600 table-fixed">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">지표</th>
+                        <th class="px-3 py-2 text-right font-semibold">시가총액(억)</th>
+                        <th class="px-3 py-2 text-right font-semibold">거래대금(백만)</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 font-mono">
+                      <tr>
+                        <td class="px-3 py-2 font-medium bg-slate-50 text-slate-700">시가총액(억)</td>
+                        <td class="px-3 py-2 text-right">1.0000</td>
+                        <td id="td-corr-value-1" class="px-3 py-2 text-right font-semibold text-blue-600">-</td>
+                      </tr>
+                      <tr>
+                        <td class="px-3 py-2 font-medium bg-slate-50 text-slate-700">거래대금(백만)</td>
+                        <td id="td-corr-value-2" class="px-3 py-2 text-right font-semibold text-blue-600">-</td>
+                        <td class="px-3 py-2 text-right">1.0000</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>시가총액(펀드 규모)과 거래대금(실제 거래 활성도) 간의 상관관계를 보여주는 이 산점도는 두 지표 사이의 불일치(Mismatch) 현상을 파악하여 유동성 위험을 감지하는 데 필수적입니다. 시가총액은 매우 크지만 당일 거래대금이 극히 저조한 종목들은 주로 연금용 장기 채권형이나 자산 배분형 ETF로, 유동성 공급자(LP)의 매수/매도 호가가 촘촘하지 않을 경우 거래 비용이 높아질 수 있습니다. 반대로 시가총액은 작으나 거래대금이 폭발하는 종목은 단기 테마에 편승한 투기성 자금이 일시에 유입된 것으로, 모멘텀 소멸 시 급격한 가격 변동과 호가 공백이 발생할 우려가 큽니다. 투자자는 이 산점도를 통해 자신이 거래하려는 종목의 규모 대비 유동성 수준이 적절한지 검증해야 합니다.</p>
+              </div>
+            </div>
+
+            <!-- 9. 자산군별 시가총액 점유율 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">9. 자산군별 종목 점유율 및 규모 비중</h4>
+              </div>
+              <div id="chart-asset-class-pie" class="h-[450px]"></div>
+              <div>
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 9] 자산군별 종목 수 및 총 시가총액</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">자산군</th>
+                        <th class="px-3 py-2 text-right font-semibold">종목수</th>
+                        <th class="px-3 py-2 text-right font-semibold">비중(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">총 시가총액(억)</th>
+                        <th class="px-3 py-2 text-right font-semibold">시가총액 비중(%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-asset-class-summary" class="divide-y divide-slate-100">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="bg-amber-50/70 border border-amber-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-amber-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>자산군별 종목 수와 시가총액 비중을 보여주는 이 도넛 차트는 한국 ETF 시장의 구조적 성숙도와 다각화 수준을 진단하는 데 중요합니다. 주식 지수 추종 상품이 압도적인 비중을 차지하는지, 혹은 금리형 및 채권형 ETF의 비중이 늘어나고 있는지를 통해 시장 참가자들의 전반적인 위험 선호도를 읽을 수 있습니다. 최근 고금리 장기화 기조 속에서 채권 및 금리 추종 상품의 시가총액 점유율이 높아진 것은 안정적인 이자 수익(Carry)을 노리는 대기성 자금이 ETF 시장으로 대거 유입되었음을 방증합니다. 자산배분 투자를 지향하는 개인 투자자들은 다양한 자산군별 규모를 확인하여 자산별 유동성이 확보된 대표 상품을 선택하는 기준으로 삼아야 합니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <hr class="border-slate-150">
+
+          <!-- 10. NAV 괴리율 -->
+          <div class="flex flex-col gap-4">
+            <div class="border-b border-slate-100 pb-2">
+              <h4 class="font-title font-bold text-lg text-slate-900">10. NAV 괴리율 분포 및 이상치 검출</h4>
+            </div>
+            <div id="chart-nav-disparity" class="h-[450px]"></div>
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div class="lg:col-span-1">
+                <h5 class="text-xs font-bold text-slate-500 uppercase mb-2">[표 10] 자산군별 평균 및 절대 괴리율 최댓값</h5>
+                <div class="overflow-x-auto border border-slate-100 rounded-lg">
+                  <table class="w-full text-xs text-left text-slate-600">
+                    <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                      <tr>
+                        <th class="px-3 py-2 font-semibold">자산군</th>
+                        <th class="px-3 py-2 text-right font-semibold">평균 괴리율(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">최소 괴리율(%)</th>
+                        <th class="px-3 py-2 text-right font-semibold">최대 괴리율(%)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="table-disparity-summary" class="divide-y divide-slate-100 font-mono">
+                      <!-- JS -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="lg:col-span-2 bg-rose-50/70 border border-rose-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700 flex flex-col justify-center">
+                <div class="font-bold text-rose-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>ETF의 현재 시장 가격과 순자산가치(NAV) 간의 차이를 나타내는 괴리율 분포는 해당 ETF의 유동성 공급자(LP)가 적절한 호가를 제공하여 시장의 효율성을 유지하고 있는지 평가하는 척도입니다. 괴리율이 플러스를 기록하면 고평가, 마이너스면 저평가 상태를 의미하며, 특히 해외 자산이나 원자재를 추종하는 ETF의 경우 시차나 기초자산 거래 정지 등으로 인해 괴리율이 빈번히 벌어집니다. 괴리율이 비정상적으로 큰 상태에서 거래하면 투자자는 즉각적인 손실(비싸게 사고 싸게 파는 비용)을 입게 되므로 주의해야 합니다. 이 지표를 주기적으로 모니터링하여 괴리율이 안정적으로 0% 부근에 수렴하는 운용 능력이 우수한 ETF를 선별하는 혜안이 필요합니다.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+
+  </main>
+
+  <footer class="bg-slate-900 text-slate-400 py-6 px-6 border-t border-slate-800 mt-12 text-center text-xs">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+      <p>&copy; 2026 ETF EDA Dashboard. All rights reserved.</p>
+      <div class="flex gap-4">
+        <a href="https://github.com" target="_blank" class="hover:text-white transition"><i class="fa-brands fa-github text-sm"></i> GitHub</a>
+        <a href="https://finance.naver.com" target="_blank" class="hover:text-white transition"><i class="fa-solid fa-circle-info text-sm"></i> 네이버 금융</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- 메인 비즈니스 로직 자바스크립트 -->
+  <script>
+    // 전역 상태 변수들
+    let allData = [];
+    let filteredData = [];
+    let updatedTime = '';
+    let currentTab = 'tab-overview';
+
+    // 정렬 관련 상태
+    let sortColumn = 'marketSum';
+    let sortDirection = 'desc';
+
+    // 필터 바운더리
+    let filterMeta = {
+      marketSum: { min: 0, max: 0, currentMin: 0, currentMax: 0 },
+      amount: { min: 0, max: 0, currentMin: 0, currentMax: 0 },
+      assetClasses: [],
+      selectedClasses: []
+    };
+
+    // DOM 요소 캐시
+    const dom = {
+      updatedTime: document.getElementById('data-updated-time'),
+      btnReset: document.getElementById('btn-reset-filters'),
+      search: document.getElementById('filter-search'),
+      assetClasses: document.getElementById('filter-asset-classes'),
+      
+      marketMin: document.getElementById('filter-market-sum-min'),
+      marketMax: document.getElementById('filter-market-sum-max'),
+      lblMarket: document.getElementById('label-market-sum'),
+      minMarketBound: document.getElementById('min-market-sum-bound'),
+      maxMarketBound: document.getElementById('max-market-sum-bound'),
+
+      amountMin: document.getElementById('filter-amount-min'),
+      amountMax: document.getElementById('filter-amount-max'),
+      lblAmount: document.getElementById('label-amount'),
+      minAmountBound: document.getElementById('min-amount-bound'),
+      maxAmountBound: document.getElementById('max-amount-bound'),
+
+      // KPIs
+      kpiTotalCount: document.getElementById('kpi-total-count'),
+      kpiTotalCountDesc: document.getElementById('kpi-total-count-desc'),
+      kpiTotalMarketSum: document.getElementById('kpi-total-market-sum'),
+      kpiAvgMarketSum: document.getElementById('kpi-avg-market-sum'),
+      kpiTotalAmount: document.getElementById('kpi-total-amount'),
+      kpiAvgAmount: document.getElementById('kpi-avg-amount'),
+      kpiTrendRatio: document.getElementById('kpi-trend-ratio'),
+      kpiTrendFlat: document.getElementById('kpi-trend-flat'),
+
+      // Tables
+      tableHead5: document.getElementById('table-head-5'),
+      tableTail5: document.getElementById('table-tail-5'),
+      tableAllBody: document.getElementById('table-all-body'),
+      tableRowCount: document.getElementById('table-row-count'),
+      allTableHeader: document.getElementById('all-table-header')
+    };
+
+    // 1. 초기 데이터 수집 및 구동
+    async function init() {
+      try {
+        const response = await fetch('./data/etf_data.json');
+        if (!response.ok) {
+          throw new Error('데이터 파일을 읽어올 수 없습니다. 경로를 확인해 주세요.');
+        }
+        const data = await response.json();
+        
+        allData = data.etf_items;
+        updatedTime = data.updated_at;
+        
+        dom.updatedTime.textContent = updatedTime;
+        
+        // 필터 초기 메타 설정
+        calculateFilterBounds();
+        renderAssetClassFilters();
+        resetFiltersUI();
+        
+        // 탭 초기 이벤트 바인딩
+        initTabNavigation();
+        initFilterEvents();
+        initTableHeaderSorting();
+        
+        // 필터 적용 및 렌더링
+        applyFilters();
+      } catch (err) {
+        console.error(err);
+        alert('데이터 로드 실패: ' + err.message);
+      }
+    }
+
+    // 2. 필터 슬라이더 최댓값/최솟값 계산
+    function calculateFilterBounds() {
+      const marketSums = allData.map(item => item.marketSum).filter(v => v !== null && !isNaN(v));
+      const amounts = allData.map(item => item.amonut).filter(v => v !== null && !isNaN(v));
+      
+      filterMeta.marketSum.min = Math.min(...marketSums);
+      filterMeta.marketSum.max = Math.max(...marketSums);
+      filterMeta.amount.min = Math.min(...amounts);
+      filterMeta.amount.max = Math.max(...amounts);
+      
+      // 고유 자산군 분류 추출
+      const classesSet = new Set(allData.map(item => item.assetClass).filter(Boolean));
+      filterMeta.assetClasses = Array.from(classesSet).sort();
+      filterMeta.selectedClasses = [...filterMeta.assetClasses]; // 기본값: 전체 선택
+    }
+
+    // 3. 자산군 체크박스 렌더링
+    function renderAssetClassFilters() {
+      dom.assetClasses.innerHTML = '';
+      filterMeta.assetClasses.forEach((cls, idx) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-2';
+        div.innerHTML = `
+          <input type="checkbox" id="class-chk-${idx}" value="${cls}" checked
+                 class="w-4 h-4 text-blue-600 bg-slate-50 border-slate-300 rounded focus:ring-blue-500 cursor-pointer class-filter-chk">
+          <label for="class-chk-${idx}" class="text-xs text-slate-700 cursor-pointer select-none font-medium">${cls}</label>
+        `;
+        dom.assetClasses.appendChild(div);
+      });
+
+      // 자산군 체크박스 이벤트 리스너
+      document.querySelectorAll('.class-filter-chk').forEach(chk => {
+        chk.addEventListener('change', () => {
+          const checked = Array.from(document.querySelectorAll('.class-filter-chk:checked')).map(c => c.value);
+          filterMeta.selectedClasses = checked;
+          applyFilters();
+        });
+      });
+    }
+
+    // 4. 필터 UI 리셋
+    function resetFiltersUI() {
+      dom.search.value = '';
+      
+      // 자산군 전체 체크
+      document.querySelectorAll('.class-filter-chk').forEach(chk => chk.checked = true);
+      filterMeta.selectedClasses = [...filterMeta.assetClasses];
+
+      // 시가총액 설정
+      dom.marketMin.min = filterMeta.marketSum.min;
+      dom.marketMin.max = filterMeta.marketSum.max;
+      dom.marketMin.value = filterMeta.marketSum.min;
+      
+      dom.marketMax.min = filterMeta.marketSum.min;
+      dom.marketMax.max = filterMeta.marketSum.max;
+      dom.marketMax.value = filterMeta.marketSum.max;
+
+      dom.minMarketBound.textContent = formatKoreanNumber(filterMeta.marketSum.min, '억');
+      dom.maxMarketBound.textContent = formatKoreanNumber(filterMeta.marketSum.max, '억');
+
+      // 거래대금 설정
+      dom.amountMin.min = filterMeta.amount.min;
+      dom.amountMin.max = filterMeta.amount.max;
+      dom.amountMin.value = filterMeta.amount.min;
+      
+      dom.amountMax.min = filterMeta.amount.min;
+      dom.amountMax.max = filterMeta.amount.max;
+      dom.amountMax.value = filterMeta.amount.max;
+
+      dom.minAmountBound.textContent = formatKoreanNumber(filterMeta.amount.min, '백만');
+      dom.maxAmountBound.textContent = formatKoreanNumber(filterMeta.amount.max, '백만');
+
+      // 라벨 갱신
+      updateSliderLabels();
+    }
+
+    // 슬라이더 라벨 텍스트 변경
+    function updateSliderLabels() {
+      dom.lblMarket.textContent = `${formatKoreanNumber(parseInt(dom.marketMin.value), '억')} ~ ${formatKoreanNumber(parseInt(dom.marketMax.value), '억')}`;
+      dom.lblAmount.textContent = `${formatKoreanNumber(parseInt(dom.amountMin.value), '백만')} ~ ${formatKoreanNumber(parseInt(dom.amountMax.value), '백만')}`;
+    }
+
+    // 한글 숫자 간소화 포맷팅
+    function formatKoreanNumber(val, unit) {
+      if (val >= 10000 && unit === '억') {
+        return `${(val / 10000).toFixed(1)}조`;
+      }
+      return `${val.toLocaleString()}${unit}`;
+    }
+
+    // 5. 필터 변경 이벤트 연동
+    function initFilterEvents() {
+      dom.btnReset.addEventListener('click', () => {
+        resetFiltersUI();
+        applyFilters();
+      });
+
+      dom.search.addEventListener('input', applyFilters);
+
+      const sliders = [dom.marketMin, dom.marketMax, dom.amountMin, dom.amountMax];
+      sliders.forEach(slider => {
+        slider.addEventListener('input', () => {
+          // 크로스 오버 방지 (Min이 Max보다 커지지 않게 제어)
+          if (parseInt(dom.marketMin.value) > parseInt(dom.marketMax.value)) {
+            if (slider === dom.marketMin) dom.marketMax.value = dom.marketMin.value;
+            else dom.marketMin.value = dom.marketMax.value;
+          }
+          if (parseInt(dom.amountMin.value) > parseInt(dom.amountMax.value)) {
+            if (slider === dom.amountMin) dom.amountMax.value = dom.amountMin.value;
+            else dom.amountMin.value = dom.amountMax.value;
+          }
+          updateSliderLabels();
+          applyFilters();
+        });
+      });
+    }
+
+    // 6. 데이터 필터링 핵심 로직
+    function applyFilters() {
+      const q = dom.search.value.trim().toLowerCase();
+      const mMin = parseInt(dom.marketMin.value);
+      const mMax = parseInt(dom.marketMax.value);
+      const aMin = parseInt(dom.amountMin.value);
+      const aMax = parseInt(dom.amountMax.value);
+
+      filteredData = allData.filter(item => {
+        // 검색 필터 (이름 또는 코드)
+        const nameMatch = item.itemname.toLowerCase().includes(q) || item.itemcode.includes(q);
+        // 자산군 필터
+        const classMatch = filterMeta.selectedClasses.includes(item.assetClass);
+        // 시총 필터
+        const marketMatch = item.marketSum >= mMin && item.marketSum <= mMax;
+        // 거래대금 필터
+        const amountMatch = item.amonut >= aMin && item.amonut <= aMax;
+
+        return nameMatch && classMatch && marketMatch && amountMatch;
+      });
+
+      // KPI 업데이트
+      updateKPIs();
+      
+      // 정렬 적용 및 탭 내용 다시 그리기
+      sortAndRenderCurrentTab();
+    }
+
+    // 7. 상단 요약 KPI 카드 데이터 계산 및 렌더링
+    function updateKPIs() {
+      const totalCount = filteredData.length;
+      const allCount = allData.length;
+      const percent = allCount > 0 ? (totalCount / allCount * 100).toFixed(1) : 0;
+
+      // 1. 총 개수
+      dom.kpiTotalCount.textContent = `${totalCount.toLocaleString()} 개`;
+      dom.kpiTotalCountDesc.textContent = `전체 대비 ${percent}%`;
+
+      // 2. 총 시가총액
+      const totalMarketSum = filteredData.reduce((acc, cur) => acc + (cur.marketSum || 0), 0);
+      const totalMarketSumTrillion = (totalMarketSum * 100000000) / 1000000000000; // 억 원 단위에서 조 원 단위 환산
+      const avgMarketSum = totalCount > 0 ? (totalMarketSum / totalCount) : 0;
+
+      dom.kpiTotalMarketSum.textContent = `${totalMarketSumTrillion.toFixed(2)} 조원`;
+      dom.kpiAvgMarketSum.textContent = `평균 ${avgMarketSum.toFixed(1)} 억원`;
+
+      // 3. 당일 총 거래대금
+      const totalAmount = filteredData.reduce((acc, cur) => acc + (cur.amonut || 0), 0);
+      const totalAmountBillion = totalAmount / 1000; // 백만 원 단위에서 십억 원 단위 환산
+      const avgAmount = totalCount > 0 ? (totalAmount / totalCount) : 0;
+
+      dom.kpiTotalAmount.textContent = `${totalAmountBillion.toFixed(2)} 십억원`;
+      dom.kpiAvgAmount.textContent = `평균 ${avgAmount.toFixed(1)} 백만원`;
+
+      // 4. 상승/하락 비율
+      const upCount = filteredData.filter(item => item.trend === '상승').length;
+      const downCount = filteredData.filter(item => item.trend === '하락').length;
+      const flatCount = filteredData.filter(item => item.trend === '보합').length;
+
+      dom.kpiTrendRatio.textContent = `🔺${upCount} | 🔻${downCount}`;
+      dom.kpiTrendFlat.textContent = `보합 ${flatCount} 개`;
+    }
+
+    // 8. 탭 내비게이션 초기화
+    function initTabNavigation() {
+      const tabBtns = document.querySelectorAll('.tab-btn');
+      
+      tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const tabId = btn.getAttribute('data-tab');
+          switchTab(tabId);
+        });
+      });
+
+      // 최초 실행 시 첫 번째 탭 활성화
+      switchTab('tab-overview');
+    }
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      
+      // 탭 버튼 스타일 활성화/비활성화
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        const isActive = btn.getAttribute('data-tab') === tabId;
+        if (isActive) {
+          btn.className = 'tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-blue-600 bg-white text-blue-600 flex items-center gap-2 shadow-sm';
+        } else {
+          btn.className = 'tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2';
+        }
+      });
+
+      // 탭 패널 가시성 처리
+      document.querySelectorAll('.tab-panel').forEach(panel => {
+        panel.classList.add('hidden');
+      });
+      document.getElementById(`content-${tabId}`).classList.remove('hidden');
+
+      // 탭별 시각화 렌더링 호출
+      renderActiveTabContent();
+    }
+
+    // 9. 테이블 정렬 관리
+    function initTableHeaderSorting() {
+      dom.allTableHeader.querySelectorAll('th[data-col]').forEach(th => {
+        th.addEventListener('click', () => {
+          const col = th.getAttribute('data-col');
+          if (sortColumn === col) {
+            sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+          } else {
+            sortColumn = col;
+            sortDirection = 'desc'; // 컬럼 바뀔 땐 기본 내림차순
+          }
+          updateSortIcons();
+          sortAndRenderCurrentTab();
+        });
+      });
+    }
+
+    function updateSortIcons() {
+      dom.allTableHeader.querySelectorAll('th[data-col]').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const icon = th.querySelector('.sort-icon');
+        if (col === sortColumn) {
+          icon.innerHTML = sortDirection === 'asc' ? ' <i class="fa-solid fa-chevron-up text-blue-600"></i>' : ' <i class="fa-solid fa-chevron-down text-blue-600"></i>';
+        } else {
+          icon.innerHTML = ' <i class="fa-solid fa-sort text-slate-300"></i>';
+        }
+      });
+    }
+
+    // 정렬 적용 및 현재 탭 그리기
+    function sortAndRenderCurrentTab() {
+      // 데이터 정렬
+      filteredData.sort((a, b) => {
+        let valA = a[sortColumn];
+        let valB = b[sortColumn];
+
+        // 문자열 정렬 지원
+        if (typeof valA === 'string') {
+          return sortDirection === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+        }
+
+        // 수치 정렬 지원 (결측치는 맨 뒤로 처리)
+        if (valA === null || valA === undefined) return 1;
+        if (valB === null || valB === undefined) return -1;
+
+        return sortDirection === 'asc' ? valA - valB : valB - valA;
+      });
+
+      renderActiveTabContent();
+    }
+
+    // 10. 활성화된 탭 그리기 분기 처리
+    function renderActiveTabContent() {
+      if (currentTab === 'tab-overview') {
+        renderOverviewTab();
+      } else if (currentTab === 'tab-scale') {
+        renderScaleTab();
+      } else if (currentTab === 'tab-volatility') {
+        renderVolatilityTab();
+      } else if (currentTab === 'tab-momentum') {
+        renderMomentumTab();
+      } else if (currentTab === 'tab-structure') {
+        renderStructureTab();
+      }
+    }
+
+    // ==========================================
+    // [탭 1] 시장 요약 및 데이터 테이블 렌더링
+    // ==========================================
+    function renderOverviewTab() {
+      // Head 5 (시총 순)
+      const headData = [...filteredData].sort((a, b) => b.marketSum - a.marketSum).slice(0, 5);
+      dom.tableHead5.innerHTML = headData.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="px-3 py-2 font-mono font-medium">${item.itemcode}</td>
+          <td class="px-3 py-2 font-semibold text-slate-900">${item.itemname}</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">${item.assetClass}</span></td>
+          <td class="px-3 py-2 text-right font-medium">${item.nowVal.toLocaleString()}원</td>
+          <td class="px-3 py-2 text-right font-bold text-slate-900">${item.marketSum.toLocaleString()}억</td>
+          <td class="px-3 py-2 text-right font-semibold ${item.changeRate > 0 ? 'text-red-500' : item.changeRate < 0 ? 'text-blue-500' : 'text-slate-500'}">
+            ${item.changeRate > 0 ? '+' : ''}${item.changeRate}%
+          </td>
+        </tr>
+      `).join('');
+
+      // Tail 5 (시총 순 역순)
+      const tailData = [...filteredData].sort((a, b) => a.marketSum - b.marketSum).slice(0, 5);
+      dom.tableTail5.innerHTML = tailData.map(item => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="px-3 py-2 font-mono font-medium">${item.itemcode}</td>
+          <td class="px-3 py-2 font-semibold text-slate-900">${item.itemname}</td>
+          <td class="px-3 py-2"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">${item.assetClass}</span></td>
+          <td class="px-3 py-2 text-right font-medium">${item.nowVal.toLocaleString()}원</td>
+          <td class="px-3 py-2 text-right font-bold text-slate-900">${item.marketSum.toLocaleString()}억</td>
+          <td class="px-3 py-2 text-right font-semibold ${item.changeRate > 0 ? 'text-red-500' : item.changeRate < 0 ? 'text-blue-500' : 'text-slate-500'}">
+            ${item.changeRate > 0 ? '+' : ''}${item.changeRate}%
+          </td>
+        </tr>
+      `).join('');
+
+      // 전체 목록 테이블 렌더링
+      dom.tableRowCount.textContent = `(${filteredData.length.toLocaleString()}개 종목)`;
+      
+      if (filteredData.length === 0) {
+        dom.tableAllBody.innerHTML = `
+          <tr>
+            <td colspan="13" class="px-4 py-8 text-center text-slate-400 font-medium bg-slate-50">
+              <i class="fa-solid fa-triangle-exclamation text-lg mb-2 block"></i> 필터 조건에 부합하는 종목이 존재하지 않습니다.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      dom.tableAllBody.innerHTML = filteredData.map(item => {
+        const chgRate = item.changeRate || 0;
+        const dispRate = item.disparityRate || 0;
+        const earnRate = item.threeMonthEarnRate || 0;
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-4 py-2.5 font-mono font-medium text-slate-400">${item.itemcode}</td>
+            <td class="px-4 py-2.5 font-semibold text-slate-900 max-w-[180px] truncate">${item.itemname}</td>
+            <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600">${item.assetClass}</span></td>
+            <td class="px-4 py-2.5 text-right font-medium">${(item.nowVal || 0).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-semibold ${chgRate > 0 ? 'text-red-500' : chgRate < 0 ? 'text-blue-500' : 'text-slate-500'}">
+              ${chgRate > 0 ? '+' : ''}${(item.changeVal || 0).toLocaleString()}
+            </td>
+            <td class="px-4 py-2.5 text-right font-bold ${chgRate > 0 ? 'text-red-500' : chgRate < 0 ? 'text-blue-500' : 'text-slate-500'}">
+              ${chgRate > 0 ? '+' : ''}${chgRate.toFixed(2)}%
+            </td>
+            <td class="px-4 py-2.5 text-right text-slate-500 font-mono">${(item.nav || 0).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-semibold ${dispRate > 0 ? 'text-amber-600' : dispRate < 0 ? 'text-indigo-600' : 'text-slate-500'}">
+              ${dispRate > 0 ? '+' : ''}${dispRate.toFixed(2)}%
+            </td>
+            <td class="px-4 py-2.5 text-right font-semibold ${earnRate > 0 ? 'text-emerald-600' : earnRate < 0 ? 'text-rose-600' : 'text-slate-500'}">
+              ${earnRate > 0 ? '+' : ''}${earnRate.toFixed(2)}%
+            </td>
+            <td class="px-4 py-2.5 text-right font-mono text-slate-500">${(item.quant || 0).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-bold text-slate-800">${(item.amonut || 0).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-right font-bold text-slate-900">${(item.marketSum || 0).toLocaleString()}</td>
+            <td class="px-4 py-2.5 text-center font-semibold">
+              <span class="px-2 py-0.5 rounded text-[10px] ${item.trend === '상승' ? 'bg-red-50 text-red-600' : item.trend === '하락' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'}">
+                ${item.trend}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // [탭 2] 규모 및 유동성 차트 & 표 렌더링
+    // ==========================================
+    function renderScaleTab() {
+      // 1. 시가총액 TOP 20
+      const top20Market = [...filteredData].sort((a, b) => b.marketSum - a.marketSum).slice(0, 20);
+      
+      // 표 채우기
+      const tbodyMarket = document.getElementById('table-top20-market');
+      tbodyMarket.innerHTML = top20Market.map((item, idx) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="px-3 py-1.5 font-bold text-slate-400 font-title">${idx + 1}</td>
+          <td class="px-3 py-1.5 font-semibold text-slate-900">${item.itemname}</td>
+          <td class="px-3 py-1.5 text-right font-bold text-slate-800">${item.marketSum.toLocaleString()}</td>
+          <td class="px-3 py-1.5 text-right font-mono">${item.nowVal.toLocaleString()}원</td>
+          <td class="px-3 py-1.5 text-right font-semibold ${item.threeMonthEarnRate > 0 ? 'text-emerald-600' : item.threeMonthEarnRate < 0 ? 'text-rose-600' : 'text-slate-500'}">
+            ${item.threeMonthEarnRate > 0 ? '+' : ''}${item.threeMonthEarnRate.toFixed(2)}%
+          </td>
+        </tr>
+      `).join('');
+
+      // Plotly 시가총액 그리기 (정렬: 작은 값 -> 큰 값으로 역정렬해야 Bar 차트에서 위로 정렬됨)
+      const chartMarketData = [...top20Market].reverse();
+      const trace1 = {
+        x: chartMarketData.map(item => item.marketSum),
+        y: chartMarketData.map(item => item.itemname),
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+          color: chartMarketData.map(item => item.marketSum),
+          colorscale: 'Blues',
+          reversescale: false
+        },
+        hovertemplate: '<b>%{y}</b><br>시가총액: %{x:,.0f} 억 원<extra></extra>'
+      };
+      
+      const layout1 = {
+        title: { text: '<b>시가총액 상위 20개 ETF</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 150, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '시가총액 (억 원)' },
+        yaxis: { automargin: true }
+      };
+      
+      Plotly.newPlot('chart-market-sum-top20', [trace1], layout1, {responsive: true, displayModeBar: false});
+
+      // 2. 거래대금 TOP 20
+      const top20Amount = [...filteredData].sort((a, b) => b.amonut - a.amonut).slice(0, 20);
+      
+      // 표 채우기
+      const tbodyAmount = document.getElementById('table-top20-amount');
+      tbodyAmount.innerHTML = top20Amount.map((item, idx) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="px-3 py-1.5 font-bold text-slate-400 font-title">${idx + 1}</td>
+          <td class="px-3 py-1.5 font-semibold text-slate-900">${item.itemname}</td>
+          <td class="px-3 py-1.5 text-right font-bold text-slate-800">${item.amonut.toLocaleString()}</td>
+          <td class="px-3 py-1.5 text-right font-semibold ${item.changeRate > 0 ? 'text-red-500' : item.changeRate < 0 ? 'text-blue-500' : 'text-slate-500'}">
+            ${item.changeRate > 0 ? '+' : ''}${item.changeRate}%
+          </td>
+          <td class="px-3 py-1.5 text-right font-mono text-slate-500">${item.quant.toLocaleString()}</td>
+        </tr>
+      `).join('');
+
+      // Plotly 거래대금 그리기
+      const chartAmountData = [...top20Amount].reverse();
+      const trace2 = {
+        x: chartAmountData.map(item => item.amonut),
+        y: chartAmountData.map(item => item.itemname),
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+          color: chartAmountData.map(item => item.amonut),
+          colorscale: 'Reds',
+          reversescale: false
+        },
+        hovertemplate: '<b>%{y}</b><br>거래대금: %{x:,.0f} 백만 원<extra></extra>'
+      };
+
+      const layout2 = {
+        title: { text: '<b>거래대금 상위 20개 ETF</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 150, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '거래대금 (백만 원)' },
+        yaxis: { automargin: true }
+      };
+
+      Plotly.newPlot('chart-amount-top20', [trace2], layout2, {responsive: true, displayModeBar: false});
+    }
+
+    // ==========================================
+    // [탭 3] 변동성 및 수익률 차트 & 표 렌더링
+    // ==========================================
+    function renderVolatilityTab() {
+      // 통계 지표 함수
+      function calculateStats(arr) {
+        if (arr.length === 0) return { count: 0, mean: 0, std: 0, min: 0, q25: 0, median: 0, q75: 0, max: 0 };
+        const n = arr.length;
+        const sum = arr.reduce((acc, v) => acc + v, 0);
+        const mean = sum / n;
+        const variance = arr.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (n - 1 || 1);
+        const std = Math.sqrt(variance);
+        
+        const sorted = [...arr].sort((a, b) => a - b);
+        const min = sorted[0];
+        const max = sorted[n - 1];
+        
+        const getPercentile = (p) => {
+          const idx = (n - 1) * p;
+          const low = Math.floor(idx);
+          const high = Math.ceil(idx);
+          return sorted[low] + (sorted[high] - sorted[low]) * (idx - low);
+        };
+        
+        return {
+          count: n,
+          mean: mean,
+          std: std,
+          min: min,
+          q25: getPercentile(0.25),
+          median: getPercentile(0.50),
+          q75: getPercentile(0.75),
+          max: max
+        };
+      }
+
+      // 3. 당일 등락률 분포
+      const changeRates = filteredData.map(item => item.changeRate).filter(v => v !== null && !isNaN(v));
+      const crStats = calculateStats(changeRates);
+      
+      const tbodyCR = document.getElementById('table-change-rate-desc');
+      tbodyCR.innerHTML = `
+        <tr>
+          <td class="px-3 py-2 font-medium text-slate-800 font-sans">통계치</td>
+          <td class="px-3 py-2 text-right">${crStats.count}</td>
+          <td class="px-3 py-2 text-right font-bold">${crStats.mean.toFixed(3)}%</td>
+          <td class="px-3 py-2 text-right">${crStats.std.toFixed(4)}</td>
+          <td class="px-3 py-2 text-right text-blue-500">${crStats.min.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right">${crStats.q25.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right font-semibold">${crStats.median.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right">${crStats.q75.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right text-red-500">${crStats.max.toFixed(2)}%</td>
+        </tr>
+      `;
+
+      // Plotly 히스토그램 그리기 (등락률)
+      const traceCR = {
+        x: changeRates,
+        type: 'histogram',
+        nbinsx: 30,
+        marker: { color: '#3b82f6', line: { color: 'white', width: 0.5 } },
+        hovertemplate: '등락률 구간: %{x}<br>종목 수: %{y}개<extra></extra>'
+      };
+
+      const layoutCR = {
+        title: { text: '<b>전체 ETF 당일 등락률 분포</b>', font: { family: 'Outfit', size: 15 } },
+        margin: { l: 40, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '등락률 (%)' },
+        yaxis: { gridcolor: '#f1f5f9', title: '종목 수 (개)' }
+      };
+
+      Plotly.newPlot('chart-change-rate-dist', [traceCR], layoutCR, {responsive: true, displayModeBar: false});
+
+      // 4. 3개월 수익률 분포
+      const earnRates = filteredData.map(item => item.threeMonthEarnRate).filter(v => v !== null && !isNaN(v));
+      const erStats = calculateStats(earnRates);
+      
+      const tbodyER = document.getElementById('table-three-month-earn-desc');
+      tbodyER.innerHTML = `
+        <tr>
+          <td class="px-3 py-2 font-medium text-slate-800 font-sans">통계치</td>
+          <td class="px-3 py-2 text-right">${erStats.count}</td>
+          <td class="px-3 py-2 text-right font-bold">${erStats.mean.toFixed(3)}%</td>
+          <td class="px-3 py-2 text-right">${erStats.std.toFixed(4)}</td>
+          <td class="px-3 py-2 text-right text-blue-500">${erStats.min.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right">${erStats.q25.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right font-semibold">${erStats.median.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right">${erStats.q75.toFixed(2)}%</td>
+          <td class="px-3 py-2 text-right text-red-500">${erStats.max.toFixed(2)}%</td>
+        </tr>
+      `;
+
+      // Plotly 히스토그램 그리기 (3개월 수익률)
+      const traceER = {
+        x: earnRates,
+        type: 'histogram',
+        nbinsx: 30,
+        marker: { color: '#10b981', line: { color: 'white', width: 0.5 } },
+        hovertemplate: '3개월 수익률 구간: %{x}<br>종목 수: %{y}개<extra></extra>'
+      };
+
+      const layoutER = {
+        title: { text: '<b>전체 ETF 3개월 수익률 분포</b>', font: { family: 'Outfit', size: 15 } },
+        margin: { l: 40, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '3개월 수익률 (%)' },
+        yaxis: { gridcolor: '#f1f5f9', title: '종목 수 (개)' }
+      };
+
+      Plotly.newPlot('chart-three-month-earn-dist', [traceER], layoutER, {responsive: true, displayModeBar: false});
+
+      // 5. 거래량 vs 거래대금 산점도
+      // 자산군별 그룹핑하여 Trace 생성
+      const tracesScatter = [];
+      const classes = Array.from(new Set(filteredData.map(d => d.assetClass)));
+      
+      classes.forEach((cls, idx) => {
+        const clsData = filteredData.filter(d => d.assetClass === cls);
+        tracesScatter.push({
+          x: clsData.map(d => d.quant),
+          y: clsData.map(d => d.amonut),
+          mode: 'markers',
+          name: cls,
+          text: clsData.map(d => `${d.itemname} (${d.itemcode})<br>현재가: ${d.nowVal.toLocaleString()}원`),
+          marker: { size: 8 },
+          hovertemplate: '<b>%{text}</b><br>거래량: %{x:,.0f} 주<br>거래대금: %{y:,.0f} 백만 원<extra></extra>'
+        });
+      });
+
+      const layoutScatter = {
+        title: { text: '<b>거래량 vs 거래대금 산점도 (자산군별 분류)</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 60, r: 20, t: 50, b: 50 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '거래량 (주)' },
+        yaxis: { gridcolor: '#f1f5f9', title: '거래대금 (백만 원)' },
+        legend: { orientation: 'h', y: -0.2 }
+      };
+
+      Plotly.newPlot('chart-quant-vs-amount', tracesScatter, layoutScatter, {responsive: true, displayModeBar: false});
+
+      // 자산군별 평균 거래량/거래대금 테이블
+      const classGroups = {};
+      filteredData.forEach(item => {
+        if (!classGroups[item.assetClass]) {
+          classGroups[item.assetClass] = { count: 0, totalQuant: 0, totalAmount: 0 };
+        }
+        classGroups[item.assetClass].count++;
+        classGroups[item.assetClass].totalQuant += (item.quant || 0);
+        classGroups[item.assetClass].totalAmount += (item.amonut || 0);
+      });
+
+      const tbodyAvg = document.getElementById('table-avg-quant-amount');
+      tbodyAvg.innerHTML = Object.keys(classGroups).sort().map(cls => {
+        const group = classGroups[cls];
+        const avgQuant = group.totalQuant / group.count;
+        const avgAmount = group.totalAmount / group.count;
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-1.5 font-semibold text-slate-800">${cls}</td>
+            <td class="px-3 py-1.5 text-right font-mono">${Math.round(avgQuant).toLocaleString()} 주</td>
+            <td class="px-3 py-1.5 text-right font-bold text-slate-800">${avgAmount.toFixed(1)} 백만</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // [탭 4] 모멘텀 & 테마 차트 & 표 렌더링
+    // ==========================================
+    function renderMomentumTab() {
+      // 6. 당일 등락률 TOP 10 (상승 + 하락)
+      const top10Up = [...filteredData].sort((a, b) => b.changeRate - a.changeRate).slice(0, 10);
+      const top10Down = [...filteredData].sort((a, b) => a.changeRate - b.changeRate).slice(0, 10).reverse(); // 하락 극단
+      const combinedMomentum = [...top10Up, ...[...top10Down].reverse()]; // 시각화용 (위에서 아래로 그리려면 순서에 유의)
+
+      // 표 채우기
+      const tbodyMom = document.getElementById('table-momentum-top10');
+      
+      let htmlMom = '';
+      top10Up.forEach((item, idx) => {
+        htmlMom += `
+          <tr class="bg-red-50/20 hover:bg-red-50/50 transition">
+            <td class="px-3 py-1.5 font-semibold text-red-600 text-center font-title">상승 ${idx+1}</td>
+            <td class="px-3 py-1.5 font-semibold text-slate-900">${item.itemname}</td>
+            <td class="px-3 py-1.5 text-right font-bold text-red-500">+${item.changeRate.toFixed(2)}%</td>
+            <td class="px-3 py-1.5 text-right font-mono">${item.nowVal.toLocaleString()}원</td>
+            <td class="px-3 py-1.5 text-right font-bold text-slate-700">${item.amonut.toLocaleString()}</td>
+          </tr>
+        `;
+      });
+      top10Down.reverse().forEach((item, idx) => {
+        htmlMom += `
+          <tr class="bg-blue-50/20 hover:bg-blue-50/50 transition">
+            <td class="px-3 py-1.5 font-semibold text-blue-600 text-center font-title">하락 ${idx+1}</td>
+            <td class="px-3 py-1.5 font-semibold text-slate-900">${item.itemname}</td>
+            <td class="px-3 py-1.5 text-right font-bold text-blue-500">${item.changeRate.toFixed(2)}%</td>
+            <td class="px-3 py-1.5 text-right font-mono">${item.nowVal.toLocaleString()}원</td>
+            <td class="px-3 py-1.5 text-right font-bold text-slate-700">${item.amonut.toLocaleString()}</td>
+          </tr>
+        `;
+      });
+      tbodyMom.innerHTML = htmlMom;
+
+      // Plotly 막대 그리기
+      const chartMomData = [...combinedMomentum].reverse(); // Plotly 수평 바 그릴 때 순서
+      const traceMom = {
+        x: chartMomData.map(item => item.changeRate),
+        y: chartMomData.map(item => item.itemname),
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+          color: chartMomData.map(item => item.changeRate),
+          colorscale: 'RdBu',
+          reversescale: true
+        },
+        hovertemplate: '<b>%{y}</b><br>등락률: %{x:+.2f}%<extra></extra>'
+      };
+
+      const layoutMom = {
+        title: { text: '<b>상위 10개(상승) vs 하위 10개(하락) ETF</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 150, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '등락률 (%)' },
+        yaxis: { automargin: true }
+      };
+
+      Plotly.newPlot('chart-momentum-top10', [traceMom], layoutMom, {responsive: true, displayModeBar: false});
+
+      // 7. 3개월 수익률 TOP 10
+      const top10Earn = [...filteredData].sort((a, b) => b.threeMonthEarnRate - a.threeMonthEarnRate).slice(0, 10);
+      
+      // 표 채우기
+      const tbodyEarn = document.getElementById('table-three-month-earn-top10');
+      tbodyEarn.innerHTML = top10Earn.map((item, idx) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="px-3 py-1.5 font-bold text-slate-400 font-title">${idx + 1}</td>
+          <td class="px-3 py-1.5 font-semibold text-slate-900">${item.itemname}</td>
+          <td class="px-3 py-1.5 text-right font-bold text-emerald-600">+${item.threeMonthEarnRate.toFixed(2)}%</td>
+          <td class="px-3 py-1.5 text-right font-bold text-slate-700">${item.marketSum.toLocaleString()}</td>
+          <td class="px-3 py-1.5 text-right font-mono">${item.nowVal.toLocaleString()}원</td>
+        </tr>
+      `).join('');
+
+      // Plotly 3개월 수익률 TOP 10
+      const chartEarnData = [...top10Earn].reverse();
+      const traceEarn = {
+        x: chartEarnData.map(item => item.threeMonthEarnRate),
+        y: chartEarnData.map(item => item.itemname),
+        type: 'bar',
+        orientation: 'h',
+        marker: {
+          color: chartEarnData.map(item => item.threeMonthEarnRate),
+          colorscale: 'Viridis'
+        },
+        hovertemplate: '<b>%{y}</b><br>3개월 수익률: %{x:+.2f}%<extra></extra>'
+      };
+
+      const layoutEarn = {
+        title: { text: '<b>3개월 중기 수익률 상위 10개 ETF</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 150, r: 20, t: 40, b: 40 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '3개월 수익률 (%)' },
+        yaxis: { automargin: true }
+      };
+
+      Plotly.newPlot('chart-three-month-earn-top10', [traceEarn], layoutEarn, {responsive: true, displayModeBar: false});
+    }
+
+    // ==========================================
+    // [탭 5] 구조 및 효율성 차트 & 표 렌더링
+    // ==========================================
+    function renderStructureTab() {
+      // 8. 시가총액 vs 거래대금 상관성 분석 (버블 차트)
+      const traceCorr = {
+        x: filteredData.map(d => d.marketSum),
+        y: filteredData.map(d => d.amonut),
+        mode: 'markers',
+        text: filteredData.map(d => d.itemname),
+        marker: {
+          size: filteredData.map(d => Math.abs(d.changeRate) * 2 + 6), // 등락률 절대값으로 크기 조정
+          color: filteredData.map(d => d.changeRate),
+          colorscale: 'RdBu',
+          reversescale: true,
+          showscale: true,
+          colorbar: { title: '등락률 (%)', titleside: 'top', thickness: 15 }
+        },
+        hovertemplate: '<b>%{text}</b><br>시가총액: %{x:,.0f} 억 원<br>거래대금: %{y:,.0f} 백만 원<br>등락률: %{marker.color:+.2f}%<extra></extra>'
+      };
+
+      const layoutCorr = {
+        title: { text: '<b>시가총액 vs 거래대금 (버블: 등락 크기)</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 60, r: 20, t: 50, b: 50 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '시가총액 (억 원)' },
+        yaxis: { gridcolor: '#f1f5f9', title: '거래대금 (백만 원)' }
+      };
+
+      Plotly.newPlot('chart-market-sum-vs-amount-corr', [traceCorr], layoutCorr, {responsive: true, displayModeBar: false});
+
+      // 피어슨 상관계수 연산
+      function getPearsonCorr(x, y) {
+        if (x.length !== y.length || x.length === 0) return 0;
+        const n = x.length;
+        const meanX = x.reduce((a, b) => a + b, 0) / n;
+        const meanY = y.reduce((a, b) => a + b, 0) / n;
+        
+        let num = 0;
+        let denX = 0;
+        let denY = 0;
+        
+        for (let i = 0; i < n; i++) {
+          const diffX = x[i] - meanX;
+          const diffY = y[i] - meanY;
+          num += diffX * diffY;
+          denX += diffX * diffX;
+          denY += diffY * diffY;
+        }
+        
+        if (denX === 0 || denY === 0) return 0;
+        return num / Math.sqrt(denX * denY);
+      }
+
+      const xVals = filteredData.map(d => d.marketSum).filter(v => v !== null && !isNaN(v));
+      const yVals = filteredData.map(d => d.amonut).filter(v => v !== null && !isNaN(v));
+      const corrVal = getPearsonCorr(xVals, yVals);
+
+      document.getElementById('td-corr-value-1').textContent = corrVal.toFixed(4);
+      document.getElementById('td-corr-value-2').textContent = corrVal.toFixed(4);
+
+      // 9. 자산군별 시가총액 점유율 (도넛 차트)
+      const assetSums = {};
+      const assetCounts = {};
+      filteredData.forEach(item => {
+        if (!assetSums[item.assetClass]) {
+          assetSums[item.assetClass] = 0;
+          assetCounts[item.assetClass] = 0;
+        }
+        assetSums[item.assetClass] += (item.marketSum || 0);
+        assetCounts[item.assetClass]++;
+      });
+
+      const totalMarketSum = Object.values(assetSums).reduce((a, b) => a + b, 0);
+      const totalCounts = Object.values(assetCounts).reduce((a, b) => a + b, 0);
+
+      // 표 채우기
+      const tbodyAsset = document.getElementById('table-asset-class-summary');
+      tbodyAsset.innerHTML = Object.keys(assetSums).sort().map(cls => {
+        const sum = assetSums[cls];
+        const cnt = assetCounts[cls];
+        const countPct = totalCounts > 0 ? (cnt / totalCounts * 100) : 0;
+        const sumPct = totalMarketSum > 0 ? (sum / totalMarketSum * 100) : 0;
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-1.5 font-semibold text-slate-800">${cls}</td>
+            <td class="px-3 py-1.5 text-right font-mono">${cnt.toLocaleString()}개</td>
+            <td class="px-3 py-1.5 text-right text-slate-400 font-mono">${countPct.toFixed(1)}%</td>
+            <td class="px-3 py-1.5 text-right font-bold text-slate-800">${sum.toLocaleString()}</td>
+            <td class="px-3 py-1.5 text-right font-bold text-blue-600 font-mono">${sumPct.toFixed(1)}%</td>
+          </tr>
+        `;
+      }).join('');
+
+      // Plotly 도넛 차트
+      const tracePie = {
+        values: Object.values(assetSums),
+        labels: Object.keys(assetSums),
+        type: 'pie',
+        hole: 0.4,
+        textinfo: 'percent',
+        hovertemplate: '<b>%{label}</b><br>총 시가총액: %{value:,.0f} 억 원<br>비중: %{percent}<extra></extra>'
+      };
+
+      const layoutPie = {
+        title: { text: '<b>자산군별 시가총액 점유율 (도넛)</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 20, r: 20, t: 55, b: 20 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        legend: { orientation: 'h', y: -0.1 }
+      };
+
+      Plotly.newPlot('chart-asset-class-pie', [tracePie], layoutPie, {responsive: true, displayModeBar: false});
+
+      // 10. NAV 괴리율 분포
+      const tracesDisp = [];
+      const classesDisp = Array.from(new Set(filteredData.map(d => d.assetClass)));
+      
+      classesDisp.forEach(cls => {
+        const clsData = filteredData.filter(d => d.assetClass === cls);
+        tracesDisp.push({
+          x: clsData.map(d => d.marketSum),
+          y: clsData.map(d => d.disparityRate),
+          mode: 'markers',
+          name: cls,
+          text: clsData.map(d => `${d.itemname}<br>현재가: ${d.nowVal.toLocaleString()}원 / NAV: ${d.nav.toLocaleString()}원`),
+          marker: { size: 7 },
+          hovertemplate: '<b>%{text}</b><br>시가총액: %{x:,.0f} 억 원<br>괴리율: %{y:+.2f}%<extra></extra>'
+        });
+      });
+
+      const layoutDisp = {
+        title: { text: '<b>시가총액 규모별 NAV 괴리율 추이</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 50, r: 20, t: 50, b: 50 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { gridcolor: '#f1f5f9', title: '시가총액 (억 원)' },
+        yaxis: { gridcolor: '#f1f5f9', title: '괴리율 (%)' },
+        legend: { orientation: 'h', y: -0.2 }
+      };
+
+      Plotly.newPlot('chart-nav-disparity', tracesDisp, layoutDisp, {responsive: true, displayModeBar: false});
+
+      // 자산군별 평균 및 절대 괴리율 최댓값 테이블
+      const disparitySummary = {};
+      filteredData.forEach(item => {
+        if (!disparitySummary[item.assetClass]) {
+          disparitySummary[item.assetClass] = { count: 0, sum: 0, min: 9999, max: -9999 };
+        }
+        const dr = item.disparityRate || 0;
+        disparitySummary[item.assetClass].count++;
+        disparitySummary[item.assetClass].sum += dr;
+        if (dr < disparitySummary[item.assetClass].min) disparitySummary[item.assetClass].min = dr;
+        if (dr > disparitySummary[item.assetClass].max) disparitySummary[item.assetClass].max = dr;
+      });
+
+      const tbodyDisp = document.getElementById('table-disparity-summary');
+      tbodyDisp.innerHTML = Object.keys(disparitySummary).sort().map(cls => {
+        const info = disparitySummary[cls];
+        const avg = info.sum / info.count;
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-1.5 font-semibold text-slate-800">${cls}</td>
+            <td class="px-3 py-1.5 text-right font-bold ${avg > 0 ? 'text-amber-600' : avg < 0 ? 'text-indigo-600' : 'text-slate-500'}">${avg.toFixed(3)}%</td>
+            <td class="px-3 py-1.5 text-right text-blue-500">${info.min === 9999 ? '0.00' : info.min.toFixed(2)}%</td>
+            <td class="px-3 py-1.5 text-right text-red-500">${info.max === -9999 ? '0.00' : info.max.toFixed(2)}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // 초기 로딩
+    window.onload = init;
+  </script>
+</body>
+</html>

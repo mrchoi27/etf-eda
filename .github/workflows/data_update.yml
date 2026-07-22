@@ -1,0 +1,56 @@
+name: Realtime ETF Data Update and Deploy
+
+on:
+  schedule:
+    # 한국 시간(KST) 평일(월-금) 09:00 ~ 16:00 매시 정각 구동
+    # UTC 기준 00:00 ~ 07:00에 해당함
+    - cron: '0 0-7 * * 1-5'
+  workflow_dispatch: # 수동 실행 가능하도록 설정
+
+permissions:
+  contents: write # 리포지토리에 변경된 JSON 데이터를 푸시하기 위한 쓰기 권한
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 소스 코드 체크아웃
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. 파이썬 환경 설정
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      # 3. uv 패키지 매니저 설치 및 의존성 설치
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install uv
+          uv pip install --system -r requirements.txt
+
+      # 4. 데이터 크롤링 및 전처리 파이프라인 실행
+      - name: Fetch and Process ETF Data
+        run: |
+          python src/collect_data.py
+
+      # 5. 변경사항 검사 및 Git Push
+      - name: Commit and Push Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 변경사항 확인
+          git add data/etf_data.json
+          
+          # 변경사항이 있는 경우에만 커밋 및 푸시
+          if git diff --staged --quiet; then
+            echo "변경된 데이터가 없습니다. 업데이트를 생략합니다."
+          else
+            git commit -m "chore: 실시간 ETF 데이터 업데이트 [$(date '+%Y-%m-%d %H:%M:%S KST')]"
+            git push
+          fi
