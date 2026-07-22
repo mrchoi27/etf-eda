@@ -4,7 +4,7 @@ on:
   schedule:
     # 한국 시간(KST) 평일(월-금) 09:00 ~ 15:00 매시 정각 구동
     # UTC 기준 00:00 ~ 06:00에 해당함
-    - cron: '0 0-6 * * 1-5'
+    - cron: '*/5 * * * *'
   workflow_dispatch: # 수동 실행 가능하도록 설정
     inputs:
       duration_minutes:
