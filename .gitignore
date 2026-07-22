@@ -1,0 +1,32 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python Cache & Compiled
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Data & Images (폴더 구조는 유지하되 안의 파일들은 제외)
+/data/*
+!/data/.gitkeep
+/images/*
+!/images/.gitkeep
+
+# Streamlit config & secrets
+.streamlit/config.toml
+.streamlit/secrets.toml
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+# OS System Files
+.DS_Store
+Thumbs.db
