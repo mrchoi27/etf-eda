@@ -206,6 +206,9 @@
         <button data-tab="tab-structure" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
           <i class="fa-solid fa-puzzle-piece"></i>자산군 구조 & 시장 효율성
         </button>
+        <button data-tab="tab-provider" class="tab-btn px-4 py-2.5 rounded-t-xl text-sm font-semibold transition border-b-2 border-transparent hover:bg-slate-100 hover:text-slate-900 text-slate-600 flex items-center gap-2">
+          <i class="fa-solid fa-building-columns"></i>운용사별 분석
+        </button>
       </nav>
 
       <!-- 탭별 본문 영역 -->
@@ -665,6 +668,122 @@
                 </div>
                 <p>ETF의 현재 시장 가격과 순자산가치(NAV) 간의 차이를 나타내는 괴리율 분포는 해당 ETF의 유동성 공급자(LP)가 적절한 호가를 제공하여 시장의 효율성을 유지하고 있는지 평가하는 척도입니다. 괴리율이 플러스를 기록하면 고평가, 마이너스면 저평가 상태를 의미하며, 특히 해외 자산이나 원자재를 추종하는 ETF의 경우 시차나 기초자산 거래 정지 등으로 인해 괴리율이 빈번히 벌어집니다. 괴리율이 비정상적으로 큰 상태에서 거래하면 투자자는 즉각적인 손실(비싸게 사고 싸게 파는 비용)을 입게 되므로 주의해야 합니다. 이 지표를 주기적으로 모니터링하여 괴리율이 안정적으로 0% 부근에 수렴하는 운용 능력이 우수한 ETF를 선별하는 혜안이 필요합니다.</p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 6: 운용사별 분석 -->
+        <div id="content-tab-provider" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 11. 트리맵 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">11. 운용사 및 종목 포트폴리오 트리맵</h4>
+              </div>
+              <div id="chart-provider-treemap" class="h-[500px]"></div>
+              <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>트리맵 설명 및 조작 방법
+                </div>
+                <p>본 트리맵은 운용사와 개별 종목 간의 시가총액 비중 관계를 시각적으로 계층화하여 나타냅니다. 운용사 영역(예: 삼성자산운용)을 클릭하시면 해당 운용사의 전체 ETF 포트폴리오 상세 내역을 줌인(Zoom-in)하여 확인할 수 있으며, 상단의 네비게이션 경로(Root)를 클릭해 다시 상위 수준으로 줌아웃(Zoom-out)할 수 있습니다.</p>
+              </div>
+            </div>
+
+            <!-- 12. 막대 그래프 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">12. 운용사별 총 시가총액 비교 막대</h4>
+              </div>
+              <div id="chart-provider-bar" class="h-[500px]"></div>
+              <div class="bg-rose-50/70 border border-rose-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-rose-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>자산운용업계 내 시가총액 순위는 상위 2개 사(삼성자산운용, 미래에셋자산운용)에 대한 유입 쏠림 현상이 과점 구도를 형성하고 있음을 명확하게 증명합니다. 이는 업계 1위 지위를 둘러싼 수수료 인하 경쟁과 함께, 대표 지수 패시브 자금과 테마형 액티브 자금의 브랜드 유입 장벽이 높음을 시사합니다. 중소형사들은 틈새시장(Niche Market)을 노려 차별화된 테마나 액티브 상품을 출시함으로써 점유율 탈환을 모색하고 있습니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 운용사 요약 표 -->
+          <div class="flex flex-col gap-4">
+            <div class="border-b border-slate-100 pb-2">
+              <h4 class="font-title font-bold text-lg text-slate-900">운용사별 시장 점유율 요약 표</h4>
+            </div>
+            <div class="overflow-x-auto border border-slate-100 rounded-lg">
+              <table class="w-full text-xs text-left text-slate-600">
+                <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th class="px-3 py-2 font-semibold">운용사</th>
+                    <th class="px-3 py-2 text-right font-semibold">상장 종목 수</th>
+                    <th class="px-3 py-2 text-right font-semibold">종목수 비중(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">총 시가총액(억 원)</th>
+                    <th class="px-3 py-2 text-right font-semibold">시총 비중(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">평균 괴리율(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">당일 거래대금 합계(백만 원)</th>
+                  </tr>
+                </thead>
+                <tbody id="table-provider-summary" class="divide-y divide-slate-100">
+                  <!-- JS 렌더링 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 탭 6: 운용사별 분석 -->
+        <div id="content-tab-provider" class="tab-panel hidden flex flex-col gap-10">
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 11. 트리맵 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">11. 운용사 및 종목 포트폴리오 트리맵</h4>
+              </div>
+              <div id="chart-provider-treemap" class="h-[500px]"></div>
+              <div class="bg-blue-50/70 border border-blue-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>트리맵 설명 및 조작 방법
+                </div>
+                <p>본 트리맵은 운용사와 개별 종목 간의 시가총액 비중 관계를 시각적으로 계층화하여 나타냅니다. 운용사 영역(예: 삼성자산운용)을 클릭하시면 해당 운용사의 전체 ETF 포트폴리오 상세 내역을 줌인(Zoom-in)하여 확인할 수 있으며, 상단의 네비게이션 경로(Root)를 클릭해 다시 상위 수준으로 줌아웃(Zoom-out)할 수 있습니다.</p>
+              </div>
+            </div>
+
+            <!-- 12. 막대 그래프 -->
+            <div class="flex flex-col gap-4">
+              <div class="border-b border-slate-100 pb-2">
+                <h4 class="font-title font-bold text-lg text-slate-900">12. 운용사별 총 시가총액 비교 막대</h4>
+              </div>
+              <div id="chart-provider-bar" class="h-[500px]"></div>
+              <div class="bg-rose-50/70 border border-rose-100 p-4 rounded-xl text-xs leading-relaxed text-slate-700">
+                <div class="font-bold text-rose-900 mb-1.5 flex items-center gap-1.5">
+                  <i class="fa-solid fa-lightbulb"></i>분석 및 비즈니스 인사이트 (20년차 분석가 제언)
+                </div>
+                <p>자산운용업계 내 시가총액 순위는 상위 2개 사(삼성자산운용, 미래에셋자산운용)에 대한 유입 쏠림 현상이 과점 구도를 형성하고 있음을 명확하게 증명합니다. 이는 업계 1위 지위를 둘러싼 수수료 인하 경쟁과 함께, 대표 지수 패시브 자금과 테마형 액티브 자금의 브랜드 유입 장벽이 높음을 시사합니다. 중소형사들은 틈새시장(Niche Market)을 노려 차별화된 테마나 액티브 상품을 출시함으로써 점유율 탈환을 모색하고 있습니다.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 운용사 요약 표 -->
+          <div class="flex flex-col gap-4">
+            <div class="border-b border-slate-100 pb-2">
+              <h4 class="font-title font-bold text-lg text-slate-900">운용사별 시장 점유율 요약 표</h4>
+            </div>
+            <div class="overflow-x-auto border border-slate-100 rounded-lg">
+              <table class="w-full text-xs text-left text-slate-600">
+                <thead class="text-[10px] text-slate-500 uppercase bg-slate-50 border-b border-slate-100">
+                  <tr>
+                    <th class="px-3 py-2 font-semibold">운용사</th>
+                    <th class="px-3 py-2 text-right font-semibold">상장 종목 수</th>
+                    <th class="px-3 py-2 text-right font-semibold">종목수 비중(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">총 시가총액(억 원)</th>
+                    <th class="px-3 py-2 text-right font-semibold">시총 비중(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">평균 괴리율(%)</th>
+                    <th class="px-3 py-2 text-right font-semibold">당일 거래대금 합계(백만 원)</th>
+                  </tr>
+                </thead>
+                <tbody id="table-provider-summary" class="divide-y divide-slate-100">
+                  <!-- JS 렌더링 -->
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1685,6 +1804,148 @@
             <td class="px-3 py-1.5 text-right font-bold ${avg > 0 ? 'text-amber-600' : avg < 0 ? 'text-indigo-600' : 'text-slate-500'}">${avg.toFixed(3)}%</td>
             <td class="px-3 py-1.5 text-right text-blue-500">${info.min === 9999 ? '0.00' : info.min.toFixed(2)}%</td>
             <td class="px-3 py-1.5 text-right text-red-500">${info.max === -9999 ? '0.00' : info.max.toFixed(2)}%</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==========================================
+    // [탭 6] 운용사별 분석 (트리맵 / 막대 그래프)
+    // ==========================================
+    function renderProviderTab() {
+      if (filteredData.length === 0) {
+        document.getElementById('table-provider-summary').innerHTML = `
+          <tr>
+            <td colspan="7" class="px-4 py-8 text-center text-slate-400 font-medium bg-slate-50">
+              <i class="fa-solid fa-triangle-exclamation text-lg mb-2 block"></i> 데이터가 존재하지 않습니다.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      // 1. 운용사별 데이터 가공 및 집계
+      const providerData = {};
+      let totalFilteredMarketSum = 0;
+      let totalFilteredCount = filteredData.length;
+
+      filteredData.forEach(item => {
+        const prov = item.provider || '기타';
+        if (!providerData[prov]) {
+          providerData[prov] = {
+            name: prov,
+            count: 0,
+            marketSum: 0,
+            amount: 0,
+            disparitySum: 0,
+            items: []
+          };
+        }
+        providerData[prov].count++;
+        providerData[prov].marketSum += (item.marketSum || 0);
+        providerData[prov].amount += (item.amonut || 0);
+        providerData[prov].disparitySum += (item.disparityRate || 0);
+        providerData[prov].items.push(item);
+        
+        totalFilteredMarketSum += (item.marketSum || 0);
+      });
+
+      // 2. 트리맵 계층 구조 설계 (Root: 전체, Parent: 운용사, Child: 개별 종목)
+      const treemapIds = ['전체'];
+      const treemapLabels = ['전체 ETF 시장'];
+      const treemapParents = [''];
+      const treemapValues = [totalFilteredMarketSum];
+
+      // 각 운용사 및 하위 종목을 계층으로 밀어 넣기
+      Object.keys(providerData).forEach(provKey => {
+        const prov = providerData[provKey];
+        const provId = `전체/${prov.name}`;
+        
+        treemapIds.push(provId);
+        treemapLabels.push(prov.name);
+        treemapParents.push('전체');
+        treemapValues.push(prov.marketSum);
+
+        // 개별 종목 추가
+        prov.items.forEach(item => {
+          const itemId = `전체/${prov.name}/${item.itemname}`;
+          treemapIds.push(itemId);
+          treemapLabels.push(item.itemname);
+          treemapParents.push(provId);
+          treemapValues.push(item.marketSum || 0);
+        });
+      });
+
+      // 트리맵 차트 렌더링
+      const treemapTrace = {
+        type: 'treemap',
+        ids: treemapIds,
+        labels: treemapLabels,
+        parents: treemapParents,
+        values: treemapValues,
+        branchvalues: 'total',
+        textinfo: 'label+value+percent parent',
+        hovertemplate: '<b>%{label}</b><br>시가총액: %{value:,.0f} 억 원<extra></extra>',
+        marker: {
+          colorscale: 'Blues'
+        }
+      };
+
+      const treemapLayout = {
+        title: { text: '<b>운용사 및 개별 종목 시가총액 트리맵</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 10, r: 10, t: 45, b: 10 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)'
+      };
+
+      Plotly.newPlot('chart-provider-treemap', [treemapTrace], treemapLayout, {responsive: true, displayModeBar: false});
+
+      // 3. 운용사별 총 시가총액 비교 막대 그래프
+      // 시가총액 순 정렬
+      const sortedProviders = Object.values(providerData).sort((a, b) => b.marketSum - a.marketSum);
+
+      const barTrace = {
+        x: sortedProviders.map(p => p.name),
+        y: sortedProviders.map(p => p.marketSum),
+        type: 'bar',
+        marker: {
+          color: '#3b82f6',
+          line: { color: '#2563eb', width: 1 }
+        },
+        hovertemplate: '<b>%{x}</b><br>총 시가총액: %{y:,.0f} 억 원<extra></extra>'
+      };
+
+      const barLayout = {
+        title: { text: '<b>운용사별 합산 시가총액 비교</b>', font: { family: 'Outfit', size: 16 } },
+        margin: { l: 50, r: 20, t: 50, b: 60 },
+        font: { family: 'Inter', size: 11 },
+        paper_bgcolor: 'rgba(0,0,0,0)',
+        plot_bgcolor: 'rgba(0,0,0,0)',
+        xaxis: { title: '자산운용사' },
+        yaxis: { gridcolor: '#f1f5f9', title: '시가총액 합계 (억 원)' }
+      };
+
+      Plotly.newPlot('chart-provider-bar', [barTrace], barLayout, {responsive: true, displayModeBar: false});
+
+      // 4. 운용사 요약 표 채우기
+      const tbodyProvider = document.getElementById('table-provider-summary');
+      tbodyProvider.innerHTML = sortedProviders.map(prov => {
+        const countPct = totalFilteredCount > 0 ? (prov.count / totalFilteredCount * 100) : 0;
+        const marketSumPct = totalFilteredMarketSum > 0 ? (prov.marketSum / totalFilteredMarketSum * 100) : 0;
+        const avgDisparity = prov.disparitySum / prov.count;
+
+        return `
+          <tr class="hover:bg-slate-50 transition">
+            <td class="px-3 py-2 font-semibold text-slate-800">${prov.name}</td>
+            <td class="px-3 py-2 text-right font-mono">${prov.count.toLocaleString()}개</td>
+            <td class="px-3 py-2 text-right text-slate-400 font-mono">${countPct.toFixed(1)}%</td>
+            <td class="px-3 py-2 text-right font-bold text-slate-800">${prov.marketSum.toLocaleString()}</td>
+            <td class="px-3 py-2 text-right font-bold text-blue-600 font-mono">${marketSumPct.toFixed(1)}%</td>
+            <td class="px-3 py-2 text-right font-semibold font-mono ${avgDisparity > 0 ? 'text-amber-600' : avgDisparity < 0 ? 'text-indigo-600' : 'text-slate-500'}">
+              ${avgDisparity > 0 ? '+' : ''}${avgDisparity.toFixed(3)}%
+            </td>
+            <td class="px-3 py-2 text-right font-bold text-slate-700 font-mono">${prov.amount.toLocaleString()}</td>
           </tr>
         `;
       }).join('');

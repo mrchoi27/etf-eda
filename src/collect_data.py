@@ -50,11 +50,56 @@ def fetch_etf_data() -> pd.DataFrame:
     return pd.DataFrame()
 
 
+def get_provider(itemname: str) -> str:
+    """ETF 종목명을 분석하여 자산운용사 명칭을 식별합니다.
+
+    브랜드 접두사(예: KODEX, TIGER 등)를 통해 
+    한국의 주요 자산운용사 정식 명칭으로 매핑합니다.
+
+    Args:
+        itemname (str): ETF의 한글 종목명.
+
+    Returns:
+        str: 매핑된 자산운용사 한글명. 식별되지 않는 브랜드인 경우 '기타'를 반환합니다.
+    """
+    if not itemname:
+        return "기타"
+    
+    # 종목명의 첫 단어(브랜드 접두사) 추출
+    tokens = itemname.split()
+    if not tokens:
+        return "기타"
+    
+    brand = tokens[0].upper()
+    
+    provider_map = {
+        "KODEX": "삼성자산운용",
+        "TIGER": "미래에셋자산운용",
+        "KBSTAR": "KB자산운용",
+        "ACE": "한국투자신탁운용",
+        "SOL": "신한자산운용",
+        "ARIRANG": "한화자산운용",
+        "PLUS": "한화자산운용",  # 한화자산운용의 신규 브랜드
+        "HANARO": "NH-Amundi자산운용",
+        "KOSEF": "키움투자자산운용",
+        "히어로즈": "키움투자자산운용",
+        "WOORI": "우리자산운용",
+        "WON": "우리자산운용",
+        "TIMEFOLIO": "타임폴리오자산운용",
+        "UNICORN": "현대자산운용",
+        "MASTER": "다올자산운용",
+        "TRUSTON": "트러스톤자산운용",
+        "마이티": "신영자산운용",
+        "에셋플러스": "에셋플러스자산운용"
+    }
+    return provider_map.get(brand, "기타")
+
+
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """수집된 ETF 데이터의 전처리 및 파생 변수를 생성합니다.
 
     데이터 타입 정합성 확보(수치형 형변환), 자산분류 한글 매핑,
-    등락 트렌드 매핑, NAV 괴리율 산출 등의 작업을 수행합니다.
+    등락 트렌드 매핑, NAV 괴리율 산출, 자산운용사 매핑 등의 작업을 수행합니다.
 
     Args:
         df (pd.DataFrame): API로부터 가져온 가공되지 않은 원본 ETF 데이터프레임.
@@ -116,6 +161,9 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
             return "보합"
 
     df["trend"] = df.apply(map_risefall, axis=1)
+
+    # ETF 브랜드를 기반으로 자산운용사 구분 변수 추가
+    df["provider"] = df["itemname"].apply(get_provider)
 
     # 결측치 처리 (수익률 등 미제공 종목은 0 또는 안전 처리)
     df["threeMonthEarnRate"] = df["threeMonthEarnRate"].fillna(0.0)
