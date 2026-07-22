@@ -2,10 +2,16 @@ name: Realtime ETF Data Update and Deploy
 
 on:
   schedule:
-    # 한국 시간(KST) 평일(월-금) 09:00 ~ 16:00 매시 정각 구동
-    # UTC 기준 00:00 ~ 07:00에 해당함
-    - cron: '0 0-7 * * 1-5'
+    # 한국 시간(KST) 평일(월-금) 09:00 ~ 15:00 매시 정각 구동
+    # UTC 기준 00:00 ~ 06:00에 해당함
+    - cron: '0 0-6 * * 1-5'
   workflow_dispatch: # 수동 실행 가능하도록 설정
+    inputs:
+      duration_minutes:
+        description: '수집을 유지할 총 시간 (분 단위, 기본 60분)'
+        required: true
+        default: '60'
+        type: 'string'
 
 permissions:
   contents: write # 리포지토리에 변경된 JSON 데이터를 푸시하기 위한 쓰기 권한
@@ -33,24 +39,44 @@ jobs:
           pip install uv
           uv pip install --system -r requirements.txt
 
-      # 4. 데이터 크롤링 및 전처리 파이프라인 실행
-      - name: Fetch and Process ETF Data
+      # 4. 1분 주기 수집 루프 실행 및 동적 Git Commit & Push
+      - name: Fetch and Commit Loop (1-minute interval)
         run: |
-          python src/collect_data.py
-
-      # 5. 변경사항 검사 및 Git Push
-      - name: Commit and Push Changes
-        run: |
+          # 유지 시간 설정 (스케줄 구동 시 60분, 수동 구동 시 입력된 값 사용)
+          DURATION=${{ github.event.inputs.duration_minutes || '60' }}
+          echo "데이터 수집 시작 (설정 시간: $DURATION 분)"
+          
+          # Git 사용자 정보 전역 설정
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 변경사항 확인
-          git add data/etf_data.json
+          # 루프 구동
+          for ((i=1; i<=DURATION; i++))
+          do
+            echo "========================================"
+            echo "[$i / $DURATION] 실시간 데이터 수집 프로세스 가동..."
+            python src/collect_data.py
+            
+            # 변경된 데이터 스테이징
+            git add data/etf_data.json
+            
+            # 변경 이력이 실질적으로 존재하는지 검사
+            if git diff --staged --quiet; then
+              echo "이전 시점 대비 시세 변화가 감지되지 않았습니다. 대기 상태로 전환합니다."
+            else
+              echo "실시간 시세 변화 감지! 원격 리포지토리에 반영합니다."
+              # 충돌 방지를 위한 rebase 병합 후 커밋/푸시
+              git pull --rebase
+              git commit -m "chore: 실시간 ETF 데이터 업데이트 [$(date '+%Y-%m-%d %H:%M:%S KST')]"
+              git push
+            fi
+            
+            # 마지막 루프가 아닌 경우에만 60초 sleep 처리
+            if [ $i -lt $DURATION ]; then
+              echo "60초 대기 중..."
+              sleep 60
+            fi
+          done
           
-          # 변경사항이 있는 경우에만 커밋 및 푸시
-          if git diff --staged --quiet; then
-            echo "변경된 데이터가 없습니다. 업데이트를 생략합니다."
-          else
-            git commit -m "chore: 실시간 ETF 데이터 업데이트 [$(date '+%Y-%m-%d %H:%M:%S KST')]"
-            git push
-          fi
+          echo "========================================"
+          echo "지정된 수집 기간($DURATION 분)이 만료되어 워크플로우를 안전하게 종료합니다."
